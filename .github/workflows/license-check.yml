@@ -3,14 +3,10 @@ name: License Check
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [main]
-  schedule:
-    # Run weekly on Mondays at 9am UTC
-    - cron: '0 9 * * 1'
 
 permissions:
   contents: read
+  pull-requests: write  # For commenting on PRs
 
 jobs:
   check-licenses:
@@ -78,6 +74,61 @@ jobs:
 
           echo ""
           echo "✅ No restricted licenses found!"
+
+      - name: Comment on PR (if violations found)
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let licenses = '';
+            try {
+              licenses = fs.readFileSync('licenses.txt', 'utf8');
+            } catch (e) {
+              console.log('Could not read licenses.txt');
+              return;
+            }
+
+            const restrictedLicenses = ['AGPL', 'GPL-2.0', 'GPL-3.0', 'LGPL-2.0', 'LGPL-2.1', 'LGPL-3.0', 'SSPL', 'Commons-Clause', 'BUSL'];
+
+            let violations = '';
+            for (const license of restrictedLicenses) {
+              const regex = new RegExp(license, 'i');
+              const matches = licenses.split('\n').filter(line => regex.test(line));
+              if (matches.length > 0) {
+                violations += matches.join('\n') + '\n';
+              }
+            }
+
+            if (!violations) {
+              return;
+            }
+
+            const body = `## ❌ License Check Failed
+
+            This PR cannot be merged because restricted licenses were detected in dependencies.
+
+            ### Restricted Licenses Found:
+            \`\`\`
+            ${violations}
+            \`\`\`
+
+            ### Blocked License Types:
+            - AGPL (all versions)
+            - GPL-2.0, GPL-3.0
+            - LGPL-2.0, LGPL-2.1, LGPL-3.0
+            - SSPL (Server Side Public License)
+            - Commons Clause
+            - BUSL (Business Source License)
+
+            **Action Required:** Please remove or replace the dependencies with restricted licenses before this PR can be merged.`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
 
       - name: Generate license report
         if: success()
