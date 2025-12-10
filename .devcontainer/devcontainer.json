@@ -1,0 +1,30 @@
+{
+	"$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json",
+	"name": "Calcifer",
+	"build": {
+		"dockerfile": "Dockerfile",
+		"context": ".."
+	},
+	"capAdd": [
+		"SYS_PTRACE"
+	],
+	"securityOpt": [
+		"seccomp=unconfined"
+	],
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"golang.go",
+				"GitHub.copilot",
+				"github.vscode-github-actions",
+				"ms-azuretools.vscode-docker",
+				"Anthropic.claude-code",
+				"eamodio.gitlens",
+				"usernamehw.errorlens",
+				"tamasfe.even-better-toml"
+			]
+		}
+	},
+	"postCreateCommand": "go mod tidy",
+	"remoteUser": "vscode"
+}

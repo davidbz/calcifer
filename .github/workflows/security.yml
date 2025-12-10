@@ -1,0 +1,42 @@
+name: security
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  trufflehog:
+    runs-on: ubuntu-latest
+    name: Secret Scan
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog OSS
+        uses: trufflesecurity/trufflehog@v3.90.6
+        with:
+          path: ./
+          base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || 'HEAD~1' }}
+          head: HEAD
+          extra_args: --debug --results=verified,unknown
+
+  gosec:
+    runs-on: ubuntu-latest
+    name: Golang Security Scan
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          # Scan the entire repo recursively
+          args: ./...

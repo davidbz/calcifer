@@ -1,0 +1,75 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+.circleci
+
+# Development containers
+.devcontainer
+
+# IDEs and editors
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation
+*.md
+!README.md
+docs
+LICENSE
+
+# Test files and coverage
+*_test.go
+**/*_test.go
+*.test
+*.out
+coverage.*
+*.coverprofile
+profile.cov
+testdata
+
+# Build artifacts and binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+build/
+
+# Dependencies (if vendoring, remove vendor/ from this list)
+# vendor/
+
+# Go workspace
+go.work
+go.work.sum
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+*.crt
+secrets/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.log
+
+# Misc
+Makefile
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile*
+.dockerignore
