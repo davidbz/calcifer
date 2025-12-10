@@ -1,0 +1,104 @@
+name: License Check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # Run weekly on Mondays at 9am UTC
+    - cron: '0 9 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  check-licenses:
+    name: Check Dependency Licenses
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Install go-licenses
+        run: go install github.com/google/go-licenses@latest
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Check for restricted licenses
+        run: |
+          echo "Checking for restricted licenses..."
+
+          # List of prohibited licenses (case-insensitive patterns)
+          RESTRICTED_LICENSES=(
+            "AGPL"
+            "GPL-2.0"
+            "GPL-3.0"
+            "LGPL-2.0"
+            "LGPL-2.1"
+            "LGPL-3.0"
+            "SSPL"
+            "Commons-Clause"
+            "BUSL"
+          )
+
+          # Get all licenses from dependencies
+          echo "Scanning all dependencies for licenses..."
+          go-licenses report ./... 2>&1 | tee licenses.txt || true
+
+          # Check for restricted licenses
+          FOUND_RESTRICTED=false
+          for license in "${RESTRICTED_LICENSES[@]}"; do
+            if grep -i "$license" licenses.txt; then
+              echo "❌ ERROR: Found restricted license: $license"
+              FOUND_RESTRICTED=true
+            fi
+          done
+
+          if [ "$FOUND_RESTRICTED" = true ]; then
+            echo ""
+            echo "=========================================="
+            echo "❌ RESTRICTED LICENSES DETECTED"
+            echo "=========================================="
+            echo "The following restricted licenses were found in dependencies:"
+            echo ""
+            cat licenses.txt | grep -iE "$(IFS="|"; echo "${RESTRICTED_LICENSES[*]}")" || true
+            echo ""
+            echo "Please remove dependencies with these licenses or seek legal approval."
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ No restricted licenses found!"
+
+      - name: Generate license report
+        if: success()
+        run: |
+          echo "Generating detailed license report..."
+          echo "# License Report" > license-report.md
+          echo "" >> license-report.md
+          echo "Generated on: $(date)" >> license-report.md
+          echo "" >> license-report.md
+          echo "## All Dependency Licenses" >> license-report.md
+          echo "" >> license-report.md
+          echo '```' >> license-report.md
+          cat licenses.txt >> license-report.md
+          echo '```' >> license-report.md
+
+      - name: Upload license report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: |
+            licenses.txt
+            license-report.md
+          retention-days: 30
