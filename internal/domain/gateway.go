@@ -4,19 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
+	"github.com/davidbz/calcifer/internal/observability"
 )
 
 // GatewayService orchestrates requests to providers.
 type GatewayService struct {
 	registry       ProviderRegistry
 	costCalculator CostCalculator
+	cache          SemanticCache
 }
 
 // NewGatewayService creates a new gateway service (DI constructor).
-func NewGatewayService(registry ProviderRegistry, costCalculator CostCalculator) *GatewayService {
+func NewGatewayService(registry ProviderRegistry, costCalculator CostCalculator, cache SemanticCache) *GatewayService {
 	return &GatewayService{
 		registry:       registry,
 		costCalculator: costCalculator,
+		cache:          cache,
 	}
 }
 
@@ -92,6 +97,33 @@ func (g *GatewayService) CompleteByModel(
 		return nil, errors.New("model cannot be empty")
 	}
 
+	logger := observability.FromContext(ctx)
+
+	// Check cache for non-streaming requests
+	switch {
+	case req.Stream:
+		logger.Info("cache bypassed for streaming request")
+	case g.cache == nil:
+		logger.Info("cache is disabled (nil cache)")
+	default:
+		logger.Info("checking semantic cache",
+			observability.String("model", req.Model),
+			observability.Bool("cache_enabled", true))
+
+		cached, cacheErr := g.cache.Get(ctx, req)
+		if cacheErr != nil && !errors.Is(cacheErr, ErrCacheMiss) {
+			logger.Warn("cache get failed, continuing without cache",
+				observability.Error(cacheErr))
+		}
+		if cached != nil {
+			logger.Info("cache HIT - returning cached response",
+				observability.Float64("similarity_score", cached.SimilarityScore),
+				observability.String("cached_model", cached.Response.Model))
+			return cached.Response, nil
+		}
+		logger.Info("cache MISS - calling provider")
+	}
+
 	// Route to appropriate provider based on model.
 	provider, err := g.registry.GetByModel(ctx, req.Model)
 	if err != nil {
@@ -107,6 +139,14 @@ func (g *GatewayService) CompleteByModel(
 	// Calculate cost in domain layer
 	cost, _ := g.costCalculator.Calculate(ctx, response.Model, response.Usage)
 	response.Usage.Cost = cost
+
+	// Store in cache (only for non-streaming requests)
+	if !req.Stream && g.cache != nil {
+		if setErr := g.cache.Set(ctx, req, response, 1*time.Hour); setErr != nil {
+			logger.Warn("failed to store in cache",
+				observability.Error(setErr))
+		}
+	}
 
 	return response, nil
 }

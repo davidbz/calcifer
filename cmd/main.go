@@ -9,10 +9,13 @@ import (
 	"syscall"
 	"time"
 
+	redisClient "github.com/redis/go-redis/v9"
 	"go.uber.org/dig"
 
+	redisCache "github.com/davidbz/calcifer/internal/cache/redis"
 	"github.com/davidbz/calcifer/internal/config"
 	"github.com/davidbz/calcifer/internal/domain"
+	embeddingOpenAI "github.com/davidbz/calcifer/internal/embedding/openai"
 	"github.com/davidbz/calcifer/internal/httpserver"
 	"github.com/davidbz/calcifer/internal/httpserver/middleware"
 	"github.com/davidbz/calcifer/internal/observability"
@@ -79,6 +82,7 @@ func buildContainer() *dig.Container {
 	provideObservability(container)
 	provideRegistries(container)
 	provideCostCalculator(container)
+	provideCache(container)
 	provideEcho(container)
 	provideOpenAI(container)
 	registerProviders(container)
@@ -110,6 +114,71 @@ func provideRegistries(container *dig.Container) {
 func provideCostCalculator(container *dig.Container) {
 	mustProvide(container, func(reg domain.PricingRegistry) domain.CostCalculator {
 		return domain.NewStandardCostCalculator(reg)
+	})
+}
+
+func provideCache(container *dig.Container) {
+	// Provide Redis client (optional - returns nil if cache not enabled or connection fails)
+	mustProvide(container, func(cfg *config.CacheConfig, redisCfg *config.RedisConfig) (*redisClient.Client, error) {
+		if !cfg.Enabled {
+			return nil, ErrProviderNotConfigured
+		}
+
+		opts, err := redisClient.ParseURL(redisCfg.URL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse redis URL: %w", err)
+		}
+
+		if redisCfg.Password != "" {
+			opts.Password = redisCfg.Password
+		}
+		opts.DB = redisCfg.DB
+
+		client := redisClient.NewClient(opts)
+
+		pingCtx := context.Background()
+		if pingErr := client.Ping(pingCtx).Err(); pingErr != nil {
+			return nil, fmt.Errorf("redis connection failed: %w", pingErr)
+		}
+
+		return client, nil
+	})
+
+	// Provide SimilaritySearch (optional - returns nil if Redis client is nil)
+	mustProvide(container, func(client *redisClient.Client, cfg *config.RedisConfig) (domain.SimilaritySearch, error) {
+		if client == nil {
+			return nil, ErrProviderNotConfigured
+		}
+		return redisCache.NewVectorSearch(client, cfg.IndexName)
+	})
+
+	// Provide EmbeddingGenerator (optional - returns nil if cache not enabled)
+	mustProvide(container, func(cfg *config.CacheConfig) (domain.EmbeddingGenerator, error) {
+		if !cfg.Enabled {
+			return nil, ErrProviderNotConfigured
+		}
+
+		apiKey := os.Getenv("OPENAI_API_KEY")
+		if apiKey == "" {
+			return nil, errors.New("OPENAI_API_KEY required for cache embeddings")
+		}
+
+		return embeddingOpenAI.NewGenerator(embeddingOpenAI.Config{
+			APIKey: apiKey,
+			Model:  cfg.EmbeddingModel,
+		})
+	})
+
+	// Provide SemanticCache (optional - returns nil if not enabled or dependencies unavailable)
+	mustProvide(container, func(
+		gen domain.EmbeddingGenerator,
+		search domain.SimilaritySearch,
+		cfg *config.CacheConfig,
+	) domain.SemanticCache {
+		if !cfg.Enabled || gen == nil || search == nil {
+			return nil
+		}
+		return domain.NewSemanticCacheService(gen, search, cfg.SimilarityThreshold)
 	})
 }
 

@@ -35,7 +35,7 @@ func TestGatewayService_Complete(t *testing.T) {
 		mockRegistry.EXPECT().Get(mock.Anything, "test-provider").Return(mockProvider, nil)
 		mockCostCalc.EXPECT().Calculate(mock.Anything, "gpt-4", mock.AnythingOfType("domain.Usage")).Return(0.001, nil)
 
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -64,7 +64,7 @@ func TestGatewayService_Complete(t *testing.T) {
 	t.Run("should return error when request is nil", func(t *testing.T) {
 		mockRegistry := mocks.NewMockProviderRegistry(t)
 		mockCostCalc := mocks.NewMockCostCalculator(t)
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 
@@ -78,7 +78,7 @@ func TestGatewayService_Complete(t *testing.T) {
 	t.Run("should return error when provider name is empty", func(t *testing.T) {
 		mockRegistry := mocks.NewMockProviderRegistry(t)
 		mockCostCalc := mocks.NewMockCostCalculator(t)
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -107,7 +107,7 @@ func TestGatewayService_Complete(t *testing.T) {
 			Get(mock.Anything, "nonexistent").
 			Return(nil, errors.New("provider not found: nonexistent"))
 
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -139,7 +139,7 @@ func TestGatewayService_Complete(t *testing.T) {
 			Return(nil, errors.New("provider error"))
 		mockRegistry.EXPECT().Get(mock.Anything, "test-provider").Return(mockProvider, nil)
 
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -179,7 +179,7 @@ func TestGatewayService_Stream(t *testing.T) {
 			Return((<-chan domain.StreamChunk)(ch), nil)
 		mockRegistry.EXPECT().Get(mock.Anything, "test-provider").Return(mockProvider, nil)
 
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -215,7 +215,7 @@ func TestGatewayService_Stream(t *testing.T) {
 	t.Run("should return error when request is nil", func(t *testing.T) {
 		mockRegistry := mocks.NewMockProviderRegistry(t)
 		mockCostCalc := mocks.NewMockCostCalculator(t)
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 
@@ -229,7 +229,7 @@ func TestGatewayService_Stream(t *testing.T) {
 	t.Run("should return error when provider name is empty", func(t *testing.T) {
 		mockRegistry := mocks.NewMockProviderRegistry(t)
 		mockCostCalc := mocks.NewMockCostCalculator(t)
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -256,7 +256,7 @@ func TestGatewayService_Stream(t *testing.T) {
 			Get(mock.Anything, "nonexistent").
 			Return(nil, errors.New("provider not found: nonexistent"))
 
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -299,7 +299,7 @@ func TestGatewayService_CompleteByModel(t *testing.T) {
 			}, nil)
 		mockCostCalc.EXPECT().Calculate(mock.Anything, "gpt-4", mock.AnythingOfType("domain.Usage")).Return(0.001, nil)
 
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -327,7 +327,7 @@ func TestGatewayService_CompleteByModel(t *testing.T) {
 	t.Run("should return error when request is nil", func(t *testing.T) {
 		mockRegistry := mocks.NewMockProviderRegistry(t)
 		mockCostCalc := mocks.NewMockCostCalculator(t)
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 
@@ -341,7 +341,7 @@ func TestGatewayService_CompleteByModel(t *testing.T) {
 	t.Run("should return error when model is empty", func(t *testing.T) {
 		mockRegistry := mocks.NewMockProviderRegistry(t)
 		mockCostCalc := mocks.NewMockCostCalculator(t)
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -366,7 +366,7 @@ func TestGatewayService_CompleteByModel(t *testing.T) {
 			GetByModel(mock.Anything, "unsupported-model").
 			Return(nil, errors.New("no provider supports model: unsupported-model"))
 
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -394,7 +394,7 @@ func TestGatewayService_CompleteByModel(t *testing.T) {
 			Complete(mock.Anything, mock.AnythingOfType("*domain.CompletionRequest")).
 			Return(nil, errors.New("provider error"))
 
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -430,7 +430,7 @@ func TestGatewayService_StreamByModel(t *testing.T) {
 			Stream(mock.Anything, mock.AnythingOfType("*domain.CompletionRequest")).
 			Return((<-chan domain.StreamChunk)(ch), nil)
 
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -463,7 +463,7 @@ func TestGatewayService_StreamByModel(t *testing.T) {
 	t.Run("should return error when request is nil", func(t *testing.T) {
 		mockRegistry := mocks.NewMockProviderRegistry(t)
 		mockCostCalc := mocks.NewMockCostCalculator(t)
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 
@@ -477,7 +477,7 @@ func TestGatewayService_StreamByModel(t *testing.T) {
 	t.Run("should return error when model is empty", func(t *testing.T) {
 		mockRegistry := mocks.NewMockProviderRegistry(t)
 		mockCostCalc := mocks.NewMockCostCalculator(t)
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -503,7 +503,7 @@ func TestGatewayService_StreamByModel(t *testing.T) {
 			GetByModel(mock.Anything, "unsupported-model").
 			Return(nil, errors.New("no provider supports model: unsupported-model"))
 
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -532,7 +532,7 @@ func TestGatewayService_StreamByModel(t *testing.T) {
 			Stream(mock.Anything, mock.AnythingOfType("*domain.CompletionRequest")).
 			Return(nil, errors.New("stream error"))
 
-		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -550,5 +550,216 @@ func TestGatewayService_StreamByModel(t *testing.T) {
 		require.Contains(t, err.Error(), "failed to stream from provider")
 		mockRegistry.AssertExpectations(t)
 		mockProvider.AssertExpectations(t)
+	})
+}
+
+func TestGatewayService_CompleteByModel_WithCache(t *testing.T) {
+	t.Run("should return cached response on cache hit", func(t *testing.T) {
+		mockRegistry := mocks.NewMockProviderRegistry(t)
+		mockCostCalc := mocks.NewMockCostCalculator(t)
+		mockCache := mocks.NewMockSemanticCache(t)
+
+		ctx := context.Background()
+		req := &domain.CompletionRequest{
+			Model: "gpt-4",
+			Messages: []domain.Message{
+				{Role: "user", Content: "Hello"},
+			},
+			Stream: false,
+		}
+
+		cachedResp := &domain.CompletionResponse{
+			ID:       "cached-123",
+			Model:    "gpt-4",
+			Provider: "openai",
+			Content:  "Cached response",
+		}
+
+		mockCache.EXPECT().
+			Get(mock.Anything, req).
+			Return(&domain.CachedResponse{Response: cachedResp}, nil)
+
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, mockCache)
+
+		response, err := gateway.CompleteByModel(ctx, req)
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.Equal(t, "cached-123", response.ID)
+		require.Equal(t, "Cached response", response.Content)
+		mockCache.AssertExpectations(t)
+	})
+
+	t.Run("should call provider on cache miss and store result", func(t *testing.T) {
+		mockRegistry := mocks.NewMockProviderRegistry(t)
+		mockCostCalc := mocks.NewMockCostCalculator(t)
+		mockCache := mocks.NewMockSemanticCache(t)
+		mockProvider := mocks.NewMockProvider(t)
+
+		ctx := context.Background()
+		req := &domain.CompletionRequest{
+			Model: "gpt-4",
+			Messages: []domain.Message{
+				{Role: "user", Content: "Hello"},
+			},
+			Stream: false,
+		}
+
+		providerResp := &domain.CompletionResponse{
+			ID:       "provider-123",
+			Model:    "gpt-4",
+			Provider: "openai",
+			Content:  "Provider response",
+			Usage: domain.Usage{
+				PromptTokens:     10,
+				CompletionTokens: 20,
+				TotalTokens:      30,
+			},
+		}
+
+		mockCache.EXPECT().
+			Get(mock.Anything, req).
+			Return(nil, nil)
+
+		mockRegistry.EXPECT().
+			GetByModel(mock.Anything, "gpt-4").
+			Return(mockProvider, nil)
+
+		mockProvider.EXPECT().
+			Complete(mock.Anything, req).
+			Return(providerResp, nil)
+
+		mockCostCalc.EXPECT().
+			Calculate(mock.Anything, "gpt-4", mock.AnythingOfType("domain.Usage")).
+			Return(0.001, nil)
+
+		mockCache.EXPECT().
+			Set(mock.Anything, req, providerResp, mock.AnythingOfType("time.Duration")).
+			Return(nil)
+
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, mockCache)
+
+		response, err := gateway.CompleteByModel(ctx, req)
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.Equal(t, "provider-123", response.ID)
+		require.Equal(t, "Provider response", response.Content)
+
+		mockRegistry.AssertExpectations(t)
+		mockProvider.AssertExpectations(t)
+		mockCostCalc.AssertExpectations(t)
+		mockCache.AssertExpectations(t)
+	})
+
+	t.Run("should bypass cache for streaming requests", func(t *testing.T) {
+		mockRegistry := mocks.NewMockProviderRegistry(t)
+		mockCostCalc := mocks.NewMockCostCalculator(t)
+		mockCache := mocks.NewMockSemanticCache(t)
+		mockProvider := mocks.NewMockProvider(t)
+
+		ctx := context.Background()
+		req := &domain.CompletionRequest{
+			Model: "gpt-4",
+			Messages: []domain.Message{
+				{Role: "user", Content: "Hello"},
+			},
+			Stream: true,
+		}
+
+		providerResp := &domain.CompletionResponse{
+			ID:       "provider-123",
+			Model:    "gpt-4",
+			Provider: "openai",
+			Content:  "Provider response",
+			Usage: domain.Usage{
+				PromptTokens:     10,
+				CompletionTokens: 20,
+				TotalTokens:      30,
+			},
+		}
+
+		mockRegistry.EXPECT().
+			GetByModel(mock.Anything, "gpt-4").
+			Return(mockProvider, nil)
+
+		mockProvider.EXPECT().
+			Complete(mock.Anything, req).
+			Return(providerResp, nil)
+
+		mockCostCalc.EXPECT().
+			Calculate(mock.Anything, "gpt-4", mock.AnythingOfType("domain.Usage")).
+			Return(0.001, nil)
+
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, mockCache)
+
+		response, err := gateway.CompleteByModel(ctx, req)
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		mockRegistry.AssertExpectations(t)
+		mockProvider.AssertExpectations(t)
+		mockCostCalc.AssertExpectations(t)
+	})
+
+	t.Run("should continue on cache error", func(t *testing.T) {
+		mockRegistry := mocks.NewMockProviderRegistry(t)
+		mockCostCalc := mocks.NewMockCostCalculator(t)
+		mockCache := mocks.NewMockSemanticCache(t)
+		mockProvider := mocks.NewMockProvider(t)
+
+		ctx := context.Background()
+		req := &domain.CompletionRequest{
+			Model: "gpt-4",
+			Messages: []domain.Message{
+				{Role: "user", Content: "Hello"},
+			},
+			Stream: false,
+		}
+
+		providerResp := &domain.CompletionResponse{
+			ID:       "provider-123",
+			Model:    "gpt-4",
+			Provider: "openai",
+			Content:  "Provider response",
+			Usage: domain.Usage{
+				PromptTokens:     10,
+				CompletionTokens: 20,
+				TotalTokens:      30,
+			},
+		}
+
+		mockCache.EXPECT().
+			Get(mock.Anything, req).
+			Return(nil, errors.New("cache error"))
+
+		mockRegistry.EXPECT().
+			GetByModel(mock.Anything, "gpt-4").
+			Return(mockProvider, nil)
+
+		mockProvider.EXPECT().
+			Complete(mock.Anything, req).
+			Return(providerResp, nil)
+
+		mockCostCalc.EXPECT().
+			Calculate(mock.Anything, "gpt-4", mock.AnythingOfType("domain.Usage")).
+			Return(0.001, nil)
+
+		mockCache.EXPECT().
+			Set(mock.Anything, req, providerResp, mock.AnythingOfType("time.Duration")).
+			Return(nil)
+
+		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, mockCache)
+
+		response, err := gateway.CompleteByModel(ctx, req)
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.Equal(t, "provider-123", response.ID)
+
+		mockRegistry.AssertExpectations(t)
+		mockProvider.AssertExpectations(t)
+		mockCostCalc.AssertExpectations(t)
+		mockCache.AssertExpectations(t)
 	})
 }
