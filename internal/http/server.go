@@ -14,24 +14,24 @@ import (
 
 // Server represents the HTTP server.
 type Server struct {
-	config     config.ServerConfig
-	corsConfig *config.CORSConfig
-	handler    *Handler
-	logger     *zap.Logger
+	config      config.ServerConfig
+	handler     *Handler
+	middlewares middleware.Middleware
+	logger      *zap.Logger
 }
 
 // NewServer creates a new HTTP server.
 func NewServer(
 	cfg *config.Config,
-	corsConfig *config.CORSConfig,
 	handler *Handler,
+	middlewares middleware.Middleware,
 	logger *zap.Logger,
 ) *Server {
 	return &Server{
-		config:     cfg.Server,
-		corsConfig: corsConfig,
-		handler:    handler,
-		logger:     logger,
+		config:      cfg.Server,
+		handler:     handler,
+		middlewares: middlewares,
+		logger:      logger,
 	}
 }
 
@@ -43,14 +43,8 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/v1/completions", s.handler.HandleCompletion)
 	mux.HandleFunc("/health", s.handler.HandleHealth)
 
-	// Compose middleware chain: CORS -> Trace.
-	// Order matters: CORS runs first, then trace injection.
-	chain := middleware.Chain(
-		middleware.CORS(s.corsConfig),
-		middleware.Trace(),
-	)
-
-	handlerWithMiddleware := chain(mux)
+	// Apply middleware chain.
+	handlerWithMiddleware := s.middlewares(mux)
 
 	// Create server with timeouts.
 	srv := &http.Server{

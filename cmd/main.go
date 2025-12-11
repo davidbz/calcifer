@@ -11,6 +11,7 @@ import (
 	"github.com/davidbz/calcifer/internal/config"
 	"github.com/davidbz/calcifer/internal/domain"
 	"github.com/davidbz/calcifer/internal/http"
+	"github.com/davidbz/calcifer/internal/http/middleware"
 	"github.com/davidbz/calcifer/internal/observability"
 	"github.com/davidbz/calcifer/internal/provider/openai"
 	"github.com/davidbz/calcifer/internal/provider/registry"
@@ -102,9 +103,21 @@ func buildContainer() *dig.Container {
 	if err := container.Provide(http.NewHandler); err != nil {
 		log.Fatalf("Failed to provide HTTP handler: %v", err)
 	}
+	if err := container.Provide(buildMiddlewareChain); err != nil {
+		log.Fatalf("Failed to provide middleware chain: %v", err)
+	}
 	if err := container.Provide(http.NewServer); err != nil {
 		log.Fatalf("Failed to provide HTTP server: %v", err)
 	}
 
 	return container
+}
+
+// buildMiddlewareChain composes the middleware chain for production.
+// Order matters: CORS -> Trace.
+func buildMiddlewareChain(corsConfig *config.CORSConfig) middleware.Middleware {
+	return middleware.Chain(
+		middleware.CORS(corsConfig),
+		middleware.Trace(),
+	)
 }
