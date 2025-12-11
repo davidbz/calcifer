@@ -12,6 +12,10 @@ const (
 	maxLoggerFieldCapacity int = 5 // Maximum number of context fields to add to logger
 )
 
+// Global logger instance - shared across the application.
+// This is intentional: loggers should not be stored in context.
+//
+//nolint:gochecknoglobals // Singleton logger is a standard pattern
 var (
 	globalLogger *zap.Logger
 	loggerMu     sync.RWMutex
