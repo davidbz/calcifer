@@ -24,7 +24,7 @@ func NewRegistry() *Registry {
 }
 
 // Register adds a provider to the registry.
-func (r *Registry) Register(ctx context.Context, provider domain.Provider) error {
+func (r *Registry) Register(_ context.Context, provider domain.Provider) error {
 	if provider == nil {
 		return errors.New("provider cannot be nil")
 	}

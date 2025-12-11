@@ -125,7 +125,7 @@ func TestRegistry_List(t *testing.T) {
 		providers, err := reg.List(ctx)
 		require.NoError(t, err)
 		require.NotNil(t, providers)
-		require.Len(t, providers, 0)
+		require.Empty(t, providers)
 	})
 
 	t.Run("should return all registered providers", func(t *testing.T) {

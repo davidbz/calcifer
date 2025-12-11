@@ -29,12 +29,6 @@ type ProviderRegistry interface {
 	List(ctx context.Context) ([]string, error)
 }
 
-// EventPublisher publishes events for observability.
-type EventPublisher interface {
-	// Publish publishes an event with the given type and data.
-	Publish(ctx context.Context, eventType string, data map[string]interface{})
-}
-
 // Router determines which provider to use for a request.
 type Router interface {
 	// Route selects a provider based on request criteria.

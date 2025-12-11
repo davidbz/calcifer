@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"log/slog"
 
 	"go.uber.org/dig"
 
@@ -42,13 +41,8 @@ func buildContainer() *dig.Container {
 	}
 
 	// Observability
-	if err := container.Provide(observability.NewLogger); err != nil {
+	if err := container.Provide(observability.InitLogger); err != nil {
 		log.Fatalf("Failed to provide logger: %v", err)
-	}
-	if err := container.Provide(func(logger *slog.Logger) domain.EventPublisher {
-		return observability.NewEventBus(logger)
-	}); err != nil {
-		log.Fatalf("Failed to provide event bus: %v", err)
 	}
 
 	// Provider Registry

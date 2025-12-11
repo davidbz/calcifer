@@ -9,17 +9,12 @@ import (
 // GatewayService orchestrates requests to providers.
 type GatewayService struct {
 	registry ProviderRegistry
-	eventBus EventPublisher
 }
 
 // NewGatewayService creates a new gateway service (DI constructor).
-func NewGatewayService(
-	registry ProviderRegistry,
-	eventBus EventPublisher,
-) *GatewayService {
+func NewGatewayService(registry ProviderRegistry) *GatewayService {
 	return &GatewayService{
 		registry: registry,
-		eventBus: eventBus,
 	}
 }
 
@@ -43,27 +38,11 @@ func (g *GatewayService) Complete(
 		return nil, fmt.Errorf("provider not found: %w", err)
 	}
 
-	// Publish event for observability.
-	g.eventBus.Publish(ctx, "request.started", map[string]interface{}{
-		"provider": providerName,
-		"model":    req.Model,
-	})
-
 	// Execute request.
 	response, err := provider.Complete(ctx, req)
 	if err != nil {
-		g.eventBus.Publish(ctx, "request.failed", map[string]interface{}{
-			"provider": providerName,
-			"error":    err.Error(),
-		})
 		return nil, fmt.Errorf("completion failed: %w", err)
 	}
-
-	// Publish success event.
-	g.eventBus.Publish(ctx, "request.completed", map[string]interface{}{
-		"provider": providerName,
-		"tokens":   response.Usage.TotalTokens,
-	})
 
 	return response, nil
 }
@@ -86,11 +65,6 @@ func (g *GatewayService) Stream(
 	if err != nil {
 		return nil, fmt.Errorf("provider not found: %w", err)
 	}
-
-	g.eventBus.Publish(ctx, "stream.started", map[string]interface{}{
-		"provider": providerName,
-		"model":    req.Model,
-	})
 
 	return provider.Stream(ctx, req)
 }
