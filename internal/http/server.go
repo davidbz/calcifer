@@ -16,6 +16,7 @@ type Server struct {
 	config      config.ServerConfig
 	handler     *Handler
 	middlewares middleware.Middleware
+	srv         *http.Server
 }
 
 // NewServer creates a new HTTP server.
@@ -28,6 +29,7 @@ func NewServer(
 		config:      cfg.Server,
 		handler:     handler,
 		middlewares: middlewares,
+		srv:         nil,
 	}
 }
 
@@ -43,7 +45,7 @@ func (s *Server) Start() error {
 	handlerWithMiddleware := s.middlewares(mux)
 
 	// Create server with timeouts.
-	srv := &http.Server{
+	s.srv = &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.config.Port),
 		Handler:      handlerWithMiddleware,
 		ReadTimeout:  time.Duration(s.config.ReadTimeout) * time.Second,
@@ -53,7 +55,7 @@ func (s *Server) Start() error {
 	ctx := context.Background()
 	observability.FromContext(ctx).Info("starting HTTP server", observability.Int("port", s.config.Port))
 
-	if err := srv.ListenAndServe(); err != nil {
+	if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("server failed: %w", err)
 	}
 	return nil
@@ -62,5 +64,14 @@ func (s *Server) Start() error {
 // Shutdown gracefully shuts down the server.
 func (s *Server) Shutdown(ctx context.Context) error {
 	observability.FromContext(ctx).Info("shutting down HTTP server")
+
+	if s.srv == nil {
+		return nil
+	}
+
+	if err := s.srv.Shutdown(ctx); err != nil {
+		return fmt.Errorf("failed to shutdown server: %w", err)
+	}
+
 	return nil
 }

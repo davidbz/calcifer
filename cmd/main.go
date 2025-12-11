@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"go.uber.org/dig"
 
@@ -18,20 +21,55 @@ import (
 	"github.com/davidbz/calcifer/internal/provider/registry"
 )
 
+const (
+	// shutdownTimeout is the maximum time to wait for graceful shutdown.
+	shutdownTimeout = 30 * time.Second
+)
+
 // ErrProviderNotConfigured indicates that a provider is not configured and should be skipped.
 var ErrProviderNotConfigured = errors.New("provider not configured")
 
 func main() {
 	container := buildContainer()
+	ctx := context.Background()
+	logger := observability.FromContext(ctx)
 
-	err := container.Invoke(func(server *http.Server) {
-		if err := server.Start(); err != nil {
-			log.Fatalf("Server failed to start: %v", err)
+	// Start server in goroutine
+	serverErr := make(chan error, 1)
+	go func() {
+		err := container.Invoke(func(server *http.Server) error {
+			return server.Start()
+		})
+		serverErr <- err
+	}()
+
+	// Wait for interrupt signal
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case err := <-serverErr:
+		if err != nil {
+			logger.Fatal("server failed to start", observability.Error(err))
 		}
-	})
-	if err != nil {
-		log.Fatalf("Failed to start application: %v", err)
+	case sig := <-quit:
+		logger.Info("received shutdown signal, shutting down gracefully", observability.String("signal", sig.String()))
 	}
+
+	// Graceful shutdown with timeout
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+
+	err := container.Invoke(func(server *http.Server) error {
+		return server.Shutdown(shutdownCtx)
+	})
+	cancel()
+
+	if err != nil {
+		logger.Error("server shutdown failed", observability.Error(err))
+		os.Exit(1)
+	}
+
+	logger.Info("server shutdown complete")
 }
 
 func buildContainer() *dig.Container {
@@ -111,7 +149,9 @@ func registerProviders(container *dig.Container) {
 		return nil
 	})
 	if err != nil && !errors.Is(err, ErrProviderNotConfigured) {
-		log.Fatalf("Failed to register providers: %v", err)
+		ctx := context.Background()
+		logger := observability.FromContext(ctx)
+		logger.Fatal("failed to register providers", observability.Error(err))
 	}
 }
 
@@ -125,7 +165,11 @@ func registerPricing(container *dig.Container) {
 		}
 
 		// Register OpenAI pricing
-		return openai.RegisterPricing(ctx, pricingReg)
+		if err := openai.RegisterPricing(ctx, pricingReg); err != nil {
+			return fmt.Errorf("failed to register OpenAI pricing: %w", err)
+		}
+
+		return nil
 	})
 }
 
@@ -141,12 +185,16 @@ func provideHTTPLayer(container *dig.Container) {
 
 func mustProvide(container *dig.Container, constructor any) {
 	if err := container.Provide(constructor); err != nil {
-		log.Fatalf("Failed to provide dependency: %v", err)
+		ctx := context.Background()
+		logger := observability.FromContext(ctx)
+		logger.Fatal("failed to provide dependency", observability.Error(err))
 	}
 }
 
 func mustInvoke(container *dig.Container, function any) {
 	if err := container.Invoke(function); err != nil {
-		log.Fatalf("Failed to invoke function: %v", err)
+		ctx := context.Background()
+		logger := observability.FromContext(ctx)
+		logger.Fatal("failed to invoke function", observability.Error(err))
 	}
 }
