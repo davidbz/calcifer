@@ -138,7 +138,7 @@ func (h *Handler) handleStream(
 }
 
 // HandleHealth handles health check requests.
-func (h *Handler) HandleHealth(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleHealth(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(map[string]string{

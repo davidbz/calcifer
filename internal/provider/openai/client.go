@@ -105,8 +105,8 @@ func (c *Client) Complete(ctx context.Context, req openAIRequest) (*openAIRespon
 	}
 
 	var openAIResp openAIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&openAIResp); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	if decodeErr := json.NewDecoder(resp.Body).Decode(&openAIResp); decodeErr != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", decodeErr)
 	}
 
 	return &openAIResp, nil
@@ -160,9 +160,9 @@ func (c *Client) Stream(ctx context.Context, req openAIRequest) (<-chan streamRe
 		decoder := json.NewDecoder(resp.Body)
 		for {
 			var chunk openAIStreamChunk
-			if err := decoder.Decode(&chunk); err != nil {
-				if err != io.EOF {
-					chunks <- streamResult{Delta: "", Done: false, Error: err}
+			if decodeErr := decoder.Decode(&chunk); decodeErr != nil {
+				if decodeErr != io.EOF {
+					chunks <- streamResult{Delta: "", Done: false, Error: decodeErr}
 				}
 				return
 			}

@@ -66,5 +66,9 @@ func (g *GatewayService) Stream(
 		return nil, fmt.Errorf("provider not found: %w", err)
 	}
 
-	return provider.Stream(ctx, req)
+	chunks, err := provider.Stream(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stream from provider: %w", err)
+	}
+	return chunks, nil
 }

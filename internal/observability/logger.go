@@ -2,26 +2,32 @@ package observability
 
 import (
 	"context"
+	"fmt"
 
 	"go.uber.org/zap"
 )
 
-var baseLogger *zap.Logger
+const loggerKey contextKey = "logger"
 
 // InitLogger initializes the base logger (called once at startup).
 func InitLogger() (*zap.Logger, error) {
 	logger, err := zap.NewProduction()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize logger: %w", err)
 	}
-	baseLogger = logger
 	return logger, nil
+}
+
+// WithLogger adds a logger to the context.
+func WithLogger(ctx context.Context, logger *zap.Logger) context.Context {
+	return context.WithValue(ctx, loggerKey, logger)
 }
 
 // FromContext creates a logger with fields extracted from context.
 func FromContext(ctx context.Context) *zap.Logger {
-	if baseLogger == nil {
-		baseLogger, _ = zap.NewProduction()
+	logger, ok := ctx.Value(loggerKey).(*zap.Logger)
+	if !ok || logger == nil {
+		logger, _ = zap.NewProduction()
 	}
 
 	fields := make([]zap.Field, 0, 5)
@@ -46,5 +52,5 @@ func FromContext(ctx context.Context) *zap.Logger {
 		fields = append(fields, zap.String("model", model))
 	}
 
-	return baseLogger.With(fields...)
+	return logger.With(fields...)
 }

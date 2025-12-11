@@ -26,7 +26,7 @@ func (m *mockProvider) Name() string {
 	return m.name
 }
 
-func (m *mockProvider) IsModelSupported(_ context.Context, model string) bool {
+func (m *mockProvider) IsModelSupported(_ context.Context, _ string) bool {
 	return false
 }
 
@@ -162,7 +162,7 @@ func TestRegistry_Concurrent(t *testing.T) {
 		done := make(chan bool)
 
 		// Register providers concurrently
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			go func(idx int) {
 				provider := &mockProvider{name: string(rune('a' + idx))}
 				reg.Register(ctx, provider)
@@ -171,7 +171,7 @@ func TestRegistry_Concurrent(t *testing.T) {
 		}
 
 		// Wait for all goroutines
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			<-done
 		}
 

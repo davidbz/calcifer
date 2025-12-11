@@ -27,7 +27,7 @@ type Provider struct {
 // NewProvider creates a new OpenAI provider.
 func NewProvider(config Config) (*Provider, error) {
 	if config.APIKey == "" {
-		return nil, fmt.Errorf("OpenAI API key is required")
+		return nil, errors.New("OpenAI API key is required")
 	}
 
 	client := NewClient(config)
@@ -137,7 +137,11 @@ func (p *Provider) getModelConfig(model string) ModelConfig {
 
 	config, exists := modelConfigs[model]
 	if !exists {
-		return ModelConfig{Supported: false}
+		return ModelConfig{
+			Supported:       false,
+			InputCostPer1K:  0,
+			OutputCostPer1K: 0,
+		}
 	}
 
 	return config

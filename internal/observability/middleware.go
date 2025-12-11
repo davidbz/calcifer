@@ -7,29 +7,34 @@ import (
 )
 
 // TraceMiddleware injects trace ID and request ID into every request.
-func TraceMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
+func TraceMiddleware(logger *zap.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
 
-		traceID := GenerateTraceID()
-		ctx = WithTraceID(ctx, traceID)
+			traceID := GenerateTraceID()
+			ctx = WithTraceID(ctx, traceID)
 
-		spanID := GenerateSpanID()
-		ctx = WithSpanID(ctx, spanID)
+			spanID := GenerateSpanID()
+			ctx = WithSpanID(ctx, spanID)
 
-		requestID := GenerateRequestID()
-		ctx = WithRequestID(ctx, requestID)
+			requestID := GenerateRequestID()
+			ctx = WithRequestID(ctx, requestID)
 
-		w.Header().Set("X-Trace-Id", traceID)
-		w.Header().Set("X-Request-Id", requestID)
+			// Add logger to context
+			ctx = WithLogger(ctx, logger)
 
-		logger := FromContext(ctx)
-		logger.Info("request started",
-			zap.String("method", r.Method),
-			zap.String("path", r.URL.Path),
-			zap.String("remote_addr", r.RemoteAddr),
-		)
+			w.Header().Set("X-Trace-Id", traceID)
+			w.Header().Set("X-Request-Id", requestID)
 
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+			contextLogger := FromContext(ctx)
+			contextLogger.Info("request started",
+				zap.String("method", r.Method),
+				zap.String("path", r.URL.Path),
+				zap.String("remote_addr", r.RemoteAddr),
+			)
+
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }

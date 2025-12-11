@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -72,6 +73,7 @@ func (m *mockProvider) Complete(
 			PromptTokens:     10,
 			CompletionTokens: 20,
 			TotalTokens:      30,
+			Cost:             0.0,
 		},
 		FinishTime: time.Now(),
 	}, nil
@@ -202,7 +204,7 @@ func TestGatewayService_Complete(t *testing.T) {
 		provider := &mockProvider{
 			name: "test-provider",
 			completeFunc: func(_ context.Context, _ *domain.CompletionRequest) (*domain.CompletionResponse, error) {
-				return nil, fmt.Errorf("provider error")
+				return nil, errors.New("provider error")
 			},
 			streamFunc:      nil,
 			supportedModels: nil,

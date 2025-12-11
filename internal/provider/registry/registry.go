@@ -46,7 +46,7 @@ func (r *Registry) Register(_ context.Context, provider domain.Provider) error {
 }
 
 // Get retrieves a provider by name.
-func (r *Registry) Get(ctx context.Context, providerName string) (domain.Provider, error) {
+func (r *Registry) Get(_ context.Context, providerName string) (domain.Provider, error) {
 	if providerName == "" {
 		return nil, errors.New("provider name cannot be empty")
 	}
@@ -63,7 +63,7 @@ func (r *Registry) Get(ctx context.Context, providerName string) (domain.Provide
 }
 
 // List returns all available providers.
-func (r *Registry) List(ctx context.Context) ([]string, error) {
+func (r *Registry) List(_ context.Context) ([]string, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

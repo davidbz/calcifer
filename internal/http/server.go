@@ -35,8 +35,8 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/v1/completions", s.handler.HandleCompletion)
 	mux.HandleFunc("/health", s.handler.HandleHealth)
 
-	// Wrap with TraceMiddleware to inject trace IDs into context.
-	handlerWithTrace := observability.TraceMiddleware(mux)
+	// Wrap with TraceMiddleware to inject trace IDs and logger into context.
+	handlerWithTrace := observability.TraceMiddleware(s.logger)(mux)
 
 	// Create server with timeouts.
 	srv := &http.Server{
@@ -48,11 +48,14 @@ func (s *Server) Start() error {
 
 	s.logger.Info("starting HTTP server", zap.Int("port", s.config.Port))
 
-	return srv.ListenAndServe()
+	if err := srv.ListenAndServe(); err != nil {
+		return fmt.Errorf("server failed: %w", err)
+	}
+	return nil
 }
 
 // Shutdown gracefully shuts down the server.
-func (s *Server) Shutdown(ctx context.Context) error {
+func (s *Server) Shutdown(_ context.Context) error {
 	s.logger.Info("shutting down HTTP server")
 	return nil
 }
