@@ -81,6 +81,26 @@ func TestProvider_IsModelSupported(t *testing.T) {
 			model:     "unknown-model",
 			supported: false,
 		},
+		{
+			name:      "Claude model is not supported",
+			model:     "claude-3-opus",
+			supported: false,
+		},
+		{
+			name:      "Empty model is not supported",
+			model:     "",
+			supported: false,
+		},
+		{
+			name:      "GPT-4 Turbo Preview is supported",
+			model:     "gpt-4-turbo-preview",
+			supported: true,
+		},
+		{
+			name:      "GPT-3.5 Turbo 16k is supported",
+			model:     "gpt-3.5-turbo-16k",
+			supported: true,
+		},
 	}
 
 	ctx := context.Background()

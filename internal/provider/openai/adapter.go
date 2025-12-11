@@ -20,8 +20,9 @@ import (
 
 // Provider implements the domain.Provider interface for OpenAI
 type Provider struct {
-	client openai.Client
-	name   string
+	client          openai.Client
+	name            string
+	supportedModels map[string]bool
 }
 
 // NewProvider creates a new OpenAI provider.
@@ -47,8 +48,9 @@ func NewProvider(config Config) (*Provider, error) {
 	}
 
 	return &Provider{
-		client: openai.NewClient(opts...),
-		name:   "openai",
+		client:          openai.NewClient(opts...),
+		name:            "openai",
+		supportedModels: buildModelSet(SupportedModels()),
 	}, nil
 }
 
@@ -145,13 +147,7 @@ func (p *Provider) Name() string {
 
 // IsModelSupported checks if the provider supports the given model.
 func (p *Provider) IsModelSupported(_ context.Context, model string) bool {
-	supportedModels := map[string]bool{
-		"gpt-4":         true,
-		"gpt-4-turbo":   true,
-		"gpt-3.5-turbo": true,
-	}
-
-	return supportedModels[model]
+	return p.supportedModels[model]
 }
 
 // toSDKParams converts domain request to SDK ChatCompletionNewParams
