@@ -108,23 +108,37 @@ func (h *Handler) handleStreamByModel(
 		return
 	}
 
-	for chunk := range chunks {
-		if chunk.Error != nil {
-			logger.Error("stream chunk error", observability.Error(chunk.Error))
-			// Send error as event.
-			fmt.Fprintf(w, "event: error\ndata: %s\n\n", chunk.Error.Error())
-			flusher.Flush()
+	for {
+		select {
+		case <-ctx.Done():
+			// Client disconnected or timeout
+			logger.Info("stream context done", observability.Error(ctx.Err()))
 			return
-		}
 
-		// Send chunk as event.
-		data, _ := json.Marshal(chunk)
-		fmt.Fprintf(w, "data: %s\n\n", string(data))
-		flusher.Flush()
+		case chunk, chunkOk := <-chunks:
+			if !chunkOk {
+				// Channel closed normally
+				logger.Info("stream completed normally")
+				return
+			}
 
-		if chunk.Done {
-			logger.Info("stream completed")
-			break
+			if chunk.Error != nil {
+				logger.Error("stream chunk error", observability.Error(chunk.Error))
+				// Send error as event.
+				fmt.Fprintf(w, "event: error\ndata: %s\n\n", chunk.Error.Error())
+				flusher.Flush()
+				return
+			}
+
+			// Send chunk as event.
+			data, _ := json.Marshal(chunk)
+			fmt.Fprintf(w, "data: %s\n\n", string(data))
+			flusher.Flush()
+
+			if chunk.Done {
+				logger.Info("stream completed")
+				return
+			}
 		}
 	}
 }

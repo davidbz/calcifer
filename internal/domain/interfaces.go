@@ -15,6 +15,9 @@ type Provider interface {
 
 	// IsModelSupported checks if the provider supports the given model.
 	IsModelSupported(ctx context.Context, model string) bool
+
+	// SupportedModels returns a list of all models this provider supports.
+	SupportedModels(ctx context.Context) []string
 }
 
 // ProviderRegistry manages available providers.

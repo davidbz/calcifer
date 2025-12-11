@@ -11,20 +11,22 @@ import (
 
 // Registry implements the ProviderRegistry interface.
 type Registry struct {
-	mu        sync.RWMutex
-	providers map[string]domain.Provider
+	mu              sync.RWMutex
+	providers       map[string]domain.Provider
+	modelToProvider map[string]string
 }
 
 // NewRegistry creates a new provider registry.
 func NewRegistry() *Registry {
 	return &Registry{
-		mu:        sync.RWMutex{},
-		providers: make(map[string]domain.Provider),
+		mu:              sync.RWMutex{},
+		providers:       make(map[string]domain.Provider),
+		modelToProvider: make(map[string]string),
 	}
 }
 
 // Register adds a provider to the registry.
-func (r *Registry) Register(_ context.Context, provider domain.Provider) error {
+func (r *Registry) Register(ctx context.Context, provider domain.Provider) error {
 	if provider == nil {
 		return errors.New("provider cannot be nil")
 	}
@@ -42,6 +44,13 @@ func (r *Registry) Register(_ context.Context, provider domain.Provider) error {
 	}
 
 	r.providers[name] = provider
+
+	// Build reverse index from provider's supported models
+	supportedModels := provider.SupportedModels(ctx)
+	for _, model := range supportedModels {
+		r.modelToProvider[model] = name
+	}
+
 	return nil
 }
 
@@ -84,11 +93,24 @@ func (r *Registry) GetByModel(ctx context.Context, model string) (domain.Provide
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	for _, provider := range r.providers {
-		if provider.IsModelSupported(ctx, model) {
-			return provider, nil
+	// Use reverse index for O(1) lookup
+	providerName, exists := r.modelToProvider[model]
+	if !exists {
+		// Fallback to linear search for unknown models
+		// This handles dynamic models not in the known list
+		for _, provider := range r.providers {
+			if provider.IsModelSupported(ctx, model) {
+				return provider, nil
+			}
 		}
+		return nil, fmt.Errorf("no provider found for model: %s", model)
 	}
 
-	return nil, fmt.Errorf("no provider found for model: %s", model)
+	provider, exists := r.providers[providerName]
+	if !exists {
+		// This shouldn't happen, but handle gracefully
+		return nil, fmt.Errorf("provider not found: %s", providerName)
+	}
+
+	return provider, nil
 }

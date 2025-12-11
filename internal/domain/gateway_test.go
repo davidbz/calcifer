@@ -131,6 +131,17 @@ func (m *mockProvider) IsModelSupported(_ context.Context, model string) bool {
 	return supported
 }
 
+func (m *mockProvider) SupportedModels(_ context.Context) []string {
+	if m.supportedModels == nil {
+		return []string{}
+	}
+	models := make([]string, 0, len(m.supportedModels))
+	for model := range m.supportedModels {
+		models = append(models, model)
+	}
+	return models
+}
+
 func TestGatewayService_Complete(t *testing.T) {
 	t.Run("should complete request successfully", func(t *testing.T) {
 		registry := newMockRegistry()

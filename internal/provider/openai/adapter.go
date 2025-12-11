@@ -83,6 +83,8 @@ func (p *Provider) Complete(ctx context.Context, req *domain.CompletionRequest) 
 }
 
 // Stream sends a completion request and returns a stream of chunks.
+//
+//nolint:gocognit // Complexity required for proper context cancellation handling
 func (p *Provider) Stream(ctx context.Context, req *domain.CompletionRequest) (<-chan domain.StreamChunk, error) {
 	if req == nil {
 		return nil, errors.New("request cannot be nil")
@@ -98,14 +100,34 @@ func (p *Provider) Stream(ctx context.Context, req *domain.CompletionRequest) (<
 	stream := p.client.Chat.Completions.NewStreaming(ctx, params)
 
 	// Convert SDK stream to domain chunks channel
-	domainChunks := make(chan domain.StreamChunk)
+	// Use buffered channel to prevent blocking on first chunk
+	domainChunks := make(chan domain.StreamChunk, 1)
 
 	go func() {
 		defer close(domainChunks)
 		defer logger.Debug("OpenAI stream completed")
 
-		// Iterate over SDK stream
+		// Process stream with context cancellation support
 		for stream.Next() {
+			// Check if context is cancelled
+			select {
+			case <-ctx.Done():
+				logger.Debug("stream cancelled by context")
+				// Send cancellation error
+				select {
+				case domainChunks <- domain.StreamChunk{
+					Delta: "",
+					Done:  false,
+					Error: ctx.Err(),
+				}:
+				default:
+					// Channel full or consumer gone, exit silently
+				}
+				return
+			default:
+				// Continue processing
+			}
+
 			chunk := stream.Current()
 
 			// Extract delta content from choices
@@ -113,10 +135,19 @@ func (p *Provider) Stream(ctx context.Context, req *domain.CompletionRequest) (<
 				delta := chunk.Choices[0].Delta.Content
 				done := chunk.Choices[0].FinishReason != ""
 
-				domainChunks <- domain.StreamChunk{
+				streamChunk := domain.StreamChunk{
 					Delta: delta,
 					Done:  done,
 					Error: nil,
+				}
+
+				// Try to send chunk, but respect context cancellation
+				select {
+				case domainChunks <- streamChunk:
+					// Successfully sent
+				case <-ctx.Done():
+					logger.Debug("stream cancelled while sending chunk")
+					return
 				}
 
 				if done {
@@ -128,10 +159,19 @@ func (p *Provider) Stream(ctx context.Context, req *domain.CompletionRequest) (<
 		// Check for stream errors
 		if err := stream.Err(); err != nil {
 			if !errors.Is(err, io.EOF) {
-				domainChunks <- domain.StreamChunk{
+				logger.Error("OpenAI stream error", observability.Error(err))
+
+				// Try to send error, but don't block
+				select {
+				case domainChunks <- domain.StreamChunk{
 					Delta: "",
 					Done:  false,
 					Error: fmt.Errorf("OpenAI stream error: %w", err),
+				}:
+				case <-ctx.Done():
+					// Context cancelled, exit silently
+				default:
+					// Channel full, exit (consumer likely gone)
 				}
 			}
 		}
@@ -148,6 +188,15 @@ func (p *Provider) Name() string {
 // IsModelSupported checks if the provider supports the given model.
 func (p *Provider) IsModelSupported(_ context.Context, model string) bool {
 	return p.supportedModels[model]
+}
+
+// SupportedModels returns a list of all models this provider supports.
+func (p *Provider) SupportedModels(_ context.Context) []string {
+	models := make([]string, 0, len(p.supportedModels))
+	for model := range p.supportedModels {
+		models = append(models, model)
+	}
+	return models
 }
 
 // toSDKParams converts domain request to SDK ChatCompletionNewParams

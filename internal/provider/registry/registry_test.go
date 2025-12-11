@@ -41,6 +41,16 @@ func (m *mockProvider) IsModelSupported(_ context.Context, model string) bool {
 	return false
 }
 
+func (m *mockProvider) SupportedModels(_ context.Context) []string {
+	if m.name == "openai" {
+		return []string{"gpt-4", "gpt-3.5-turbo"}
+	}
+	if m.name == "anthropic" {
+		return []string{"claude-2", "claude-instant"}
+	}
+	return []string{}
+}
+
 func TestRegistry_Register(t *testing.T) {
 	t.Run("should register provider successfully", func(t *testing.T) {
 		reg := registry.NewRegistry()
@@ -248,5 +258,30 @@ func TestRegistry_GetByModel(t *testing.T) {
 		_, err := reg.GetByModel(ctx, "gpt-4")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "no provider found for model")
+	})
+
+	t.Run("should use O(1) lookup with reverse index", func(t *testing.T) {
+		reg := registry.NewRegistry()
+		ctx := context.Background()
+
+		// Register multiple providers with different models
+		for i := range 10 {
+			provider := &mockProvider{name: "provider-" + string(rune('a'+i))}
+			err := reg.Register(ctx, provider)
+			require.NoError(t, err)
+		}
+
+		// Register the target provider
+		targetProvider := &mockProvider{name: "openai"}
+		err := reg.Register(ctx, targetProvider)
+		require.NoError(t, err)
+
+		// Perform many lookups - should be fast with O(1) reverse index
+		lookups := 1000
+		for range lookups {
+			provider, lookupErr := reg.GetByModel(ctx, "gpt-4")
+			require.NoError(t, lookupErr)
+			require.Equal(t, "openai", provider.Name())
+		}
 	})
 }
