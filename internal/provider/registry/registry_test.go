@@ -29,7 +29,15 @@ func (m *mockProvider) Name() string {
 	return m.name
 }
 
-func (m *mockProvider) IsModelSupported(_ context.Context, _ string) bool {
+func (m *mockProvider) IsModelSupported(_ context.Context, model string) bool {
+	// Simple mock: provider supports models prefixed with its name
+	// e.g., "openai" provider supports "openai-gpt-4"
+	if m.name == "openai" && (model == "gpt-4" || model == "gpt-3.5-turbo") {
+		return true
+	}
+	if m.name == "anthropic" && (model == "claude-2" || model == "claude-instant") {
+		return true
+	}
 	return false
 }
 
@@ -181,5 +189,64 @@ func TestRegistry_Concurrent(t *testing.T) {
 		providers, err := reg.List(ctx)
 		require.NoError(t, err)
 		require.Len(t, providers, 10)
+	})
+}
+
+func TestRegistry_GetByModel(t *testing.T) {
+	t.Run("should return provider that supports the model", func(t *testing.T) {
+		reg := registry.NewRegistry()
+		ctx := context.Background()
+
+		openaiProvider := &mockProvider{name: "openai"}
+		anthropicProvider := &mockProvider{name: "anthropic"}
+
+		err := reg.Register(ctx, openaiProvider)
+		require.NoError(t, err)
+
+		err = reg.Register(ctx, anthropicProvider)
+		require.NoError(t, err)
+
+		// Test OpenAI model
+		provider, err := reg.GetByModel(ctx, "gpt-4")
+		require.NoError(t, err)
+		require.NotNil(t, provider)
+		require.Equal(t, "openai", provider.Name())
+
+		// Test Anthropic model
+		provider, err = reg.GetByModel(ctx, "claude-2")
+		require.NoError(t, err)
+		require.NotNil(t, provider)
+		require.Equal(t, "anthropic", provider.Name())
+	})
+
+	t.Run("should return error when model is empty", func(t *testing.T) {
+		reg := registry.NewRegistry()
+		ctx := context.Background()
+
+		_, err := reg.GetByModel(ctx, "")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "model cannot be empty")
+	})
+
+	t.Run("should return error when no provider supports the model", func(t *testing.T) {
+		reg := registry.NewRegistry()
+		ctx := context.Background()
+
+		openaiProvider := &mockProvider{name: "openai"}
+		err := reg.Register(ctx, openaiProvider)
+		require.NoError(t, err)
+
+		_, err = reg.GetByModel(ctx, "unsupported-model")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no provider found for model")
+	})
+
+	t.Run("should return error when registry is empty", func(t *testing.T) {
+		reg := registry.NewRegistry()
+		ctx := context.Background()
+
+		_, err := reg.GetByModel(ctx, "gpt-4")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no provider found for model")
 	})
 }

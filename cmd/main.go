@@ -14,7 +14,6 @@ import (
 	"github.com/davidbz/calcifer/internal/observability"
 	"github.com/davidbz/calcifer/internal/provider/openai"
 	"github.com/davidbz/calcifer/internal/provider/registry"
-	"github.com/davidbz/calcifer/internal/routing"
 )
 
 // ErrProviderNotConfigured indicates that a provider is not configured and should be skipped.
@@ -92,13 +91,6 @@ func buildContainer() *dig.Container {
 		if !errors.Is(err, ErrProviderNotConfigured) {
 			log.Fatalf("Failed to register providers: %v", err)
 		}
-	}
-
-	// Router
-	if err := container.Provide(func(reg domain.ProviderRegistry) domain.Router {
-		return routing.NewRouter(reg)
-	}); err != nil {
-		log.Fatalf("Failed to provide router: %v", err)
 	}
 
 	// Domain Services

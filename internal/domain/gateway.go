@@ -72,3 +72,56 @@ func (g *GatewayService) Stream(
 	}
 	return chunks, nil
 }
+
+// CompleteByModel handles a completion request with automatic provider routing.
+func (g *GatewayService) CompleteByModel(
+	ctx context.Context,
+	req *CompletionRequest,
+) (*CompletionResponse, error) {
+	if req == nil {
+		return nil, errors.New("request cannot be nil")
+	}
+
+	if req.Model == "" {
+		return nil, errors.New("model cannot be empty")
+	}
+
+	// Route to appropriate provider based on model.
+	provider, err := g.registry.GetByModel(ctx, req.Model)
+	if err != nil {
+		return nil, fmt.Errorf("provider routing failed: %w", err)
+	}
+
+	// Execute request.
+	response, err := provider.Complete(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("completion failed: %w", err)
+	}
+
+	return response, nil
+}
+
+// StreamByModel handles streaming completion requests with automatic provider routing.
+func (g *GatewayService) StreamByModel(
+	ctx context.Context,
+	req *CompletionRequest,
+) (<-chan StreamChunk, error) {
+	if req == nil {
+		return nil, errors.New("request cannot be nil")
+	}
+
+	if req.Model == "" {
+		return nil, errors.New("model cannot be empty")
+	}
+
+	provider, err := g.registry.GetByModel(ctx, req.Model)
+	if err != nil {
+		return nil, fmt.Errorf("provider routing failed: %w", err)
+	}
+
+	chunks, err := provider.Stream(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stream from provider: %w", err)
+	}
+	return chunks, nil
+}

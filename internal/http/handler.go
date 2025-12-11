@@ -15,14 +15,12 @@ import (
 // Handler handles HTTP requests.
 type Handler struct {
 	gateway *domain.GatewayService
-	router  domain.Router
 }
 
 // NewHandler creates a new HTTP handler (DI constructor).
-func NewHandler(gateway *domain.GatewayService, router domain.Router) *Handler {
+func NewHandler(gateway *domain.GatewayService) *Handler {
 	return &Handler{
 		gateway: gateway,
-		router:  router,
 	}
 }
 
@@ -48,32 +46,23 @@ func (h *Handler) HandleCompletion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Route to provider based on model.
-	provider, err := h.router.Route(ctx, &domain.RouteRequest{Model: req.Model})
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to route request: %v", err), http.StatusBadRequest)
-		return
-	}
-
-	// Inject model and provider into context for downstream logging.
+	// Inject model into context for downstream logging.
 	ctx = observability.WithModel(ctx, req.Model)
-	ctx = observability.WithProvider(ctx, provider)
 
 	logger := observability.FromContext(ctx)
 	logger.Info("completion request received",
-		zap.String("provider", provider),
 		zap.String("model", req.Model),
 		zap.Bool("stream", req.Stream),
 	)
 
 	// Handle streaming vs non-streaming.
 	if req.Stream {
-		h.handleStream(ctx, w, provider, &req)
+		h.handleStreamByModel(ctx, w, &req)
 		return
 	}
 
 	// Non-streaming response.
-	response, execErr := h.gateway.Complete(ctx, provider, &req)
+	response, execErr := h.gateway.CompleteByModel(ctx, &req)
 	if execErr != nil {
 		logger.Error("completion failed", zap.Error(execErr))
 		http.Error(w, execErr.Error(), http.StatusInternalServerError)
@@ -94,10 +83,9 @@ func (h *Handler) HandleCompletion(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) handleStream(
+func (h *Handler) handleStreamByModel(
 	ctx context.Context,
 	w http.ResponseWriter,
-	provider string,
 	req *domain.CompletionRequest,
 ) {
 	logger := observability.FromContext(ctx)
@@ -108,7 +96,7 @@ func (h *Handler) handleStream(
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	chunks, err := h.gateway.Stream(ctx, provider, req)
+	chunks, err := h.gateway.StreamByModel(ctx, req)
 	if err != nil {
 		logger.Error("stream failed", zap.Error(err))
 		http.Error(w, err.Error(), http.StatusInternalServerError)

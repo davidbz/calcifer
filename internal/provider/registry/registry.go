@@ -74,3 +74,21 @@ func (r *Registry) List(_ context.Context) ([]string, error) {
 
 	return names, nil
 }
+
+// GetByModel retrieves a provider that supports the given model.
+func (r *Registry) GetByModel(ctx context.Context, model string) (domain.Provider, error) {
+	if model == "" {
+		return nil, errors.New("model cannot be empty")
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, provider := range r.providers {
+		if provider.IsModelSupported(ctx, model) {
+			return provider, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no provider found for model: %s", model)
+}

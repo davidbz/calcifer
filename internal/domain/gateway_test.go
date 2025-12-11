@@ -50,6 +50,15 @@ func (m *mockRegistry) List(_ context.Context) ([]string, error) {
 	return names, nil
 }
 
+func (m *mockRegistry) GetByModel(ctx context.Context, model string) (domain.Provider, error) {
+	for _, provider := range m.providers {
+		if provider.IsModelSupported(ctx, model) {
+			return provider, nil
+		}
+	}
+	return nil, fmt.Errorf("no provider found for model: %s", model)
+}
+
 // mockProvider is a mock implementation of Provider for testing.
 type mockProvider struct {
 	name            string
@@ -327,5 +336,252 @@ func TestGatewayService_Stream(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, chunks)
 		require.Contains(t, err.Error(), "provider not found")
+	})
+}
+
+func TestGatewayService_CompleteByModel(t *testing.T) {
+	t.Run("should complete request with automatic routing", func(t *testing.T) {
+		registry := newMockRegistry()
+		gateway := domain.NewGatewayService(registry)
+
+		provider := &mockProvider{
+			name:            "openai",
+			completeFunc:    nil,
+			streamFunc:      nil,
+			supportedModels: map[string]struct{}{"gpt-4": {}},
+		}
+		registry.Register(context.Background(), provider)
+
+		ctx := context.Background()
+		req := &domain.CompletionRequest{
+			Model: "gpt-4",
+			Messages: []domain.Message{
+				{Role: "user", Content: "Hello"},
+			},
+			Temperature: 0.7,
+			MaxTokens:   100,
+			Stream:      false,
+		}
+
+		response, err := gateway.CompleteByModel(ctx, req)
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.Equal(t, "test-id", response.ID)
+		require.Equal(t, "openai", response.Provider)
+		require.Equal(t, "test response", response.Content)
+	})
+
+	t.Run("should return error when request is nil", func(t *testing.T) {
+		registry := newMockRegistry()
+		gateway := domain.NewGatewayService(registry)
+
+		ctx := context.Background()
+
+		response, err := gateway.CompleteByModel(ctx, nil)
+
+		require.Error(t, err)
+		require.Nil(t, response)
+		require.Contains(t, err.Error(), "request cannot be nil")
+	})
+
+	t.Run("should return error when model is empty", func(t *testing.T) {
+		registry := newMockRegistry()
+		gateway := domain.NewGatewayService(registry)
+
+		ctx := context.Background()
+		req := &domain.CompletionRequest{
+			Model: "",
+			Messages: []domain.Message{
+				{Role: "user", Content: "Hello"},
+			},
+		}
+
+		response, err := gateway.CompleteByModel(ctx, req)
+
+		require.Error(t, err)
+		require.Nil(t, response)
+		require.Contains(t, err.Error(), "model cannot be empty")
+	})
+
+	t.Run("should return error when no provider supports model", func(t *testing.T) {
+		registry := newMockRegistry()
+		gateway := domain.NewGatewayService(registry)
+
+		provider := &mockProvider{
+			name:            "openai",
+			supportedModels: map[string]struct{}{"gpt-4": {}},
+		}
+		registry.Register(context.Background(), provider)
+
+		ctx := context.Background()
+		req := &domain.CompletionRequest{
+			Model: "unsupported-model",
+			Messages: []domain.Message{
+				{Role: "user", Content: "Hello"},
+			},
+		}
+
+		response, err := gateway.CompleteByModel(ctx, req)
+
+		require.Error(t, err)
+		require.Nil(t, response)
+		require.Contains(t, err.Error(), "provider routing failed")
+	})
+
+	t.Run("should return error when provider fails", func(t *testing.T) {
+		registry := newMockRegistry()
+		gateway := domain.NewGatewayService(registry)
+
+		provider := &mockProvider{
+			name: "openai",
+			completeFunc: func(_ context.Context, _ *domain.CompletionRequest) (*domain.CompletionResponse, error) {
+				return nil, errors.New("provider error")
+			},
+			supportedModels: map[string]struct{}{"gpt-4": {}},
+		}
+		registry.Register(context.Background(), provider)
+
+		ctx := context.Background()
+		req := &domain.CompletionRequest{
+			Model: "gpt-4",
+			Messages: []domain.Message{
+				{Role: "user", Content: "Hello"},
+			},
+		}
+
+		response, err := gateway.CompleteByModel(ctx, req)
+
+		require.Error(t, err)
+		require.Nil(t, response)
+		require.Contains(t, err.Error(), "completion failed")
+	})
+}
+
+func TestGatewayService_StreamByModel(t *testing.T) {
+	t.Run("should stream request with automatic routing", func(t *testing.T) {
+		registry := newMockRegistry()
+		gateway := domain.NewGatewayService(registry)
+
+		provider := &mockProvider{
+			name:            "openai",
+			completeFunc:    nil,
+			streamFunc:      nil,
+			supportedModels: map[string]struct{}{"gpt-4": {}},
+		}
+		registry.Register(context.Background(), provider)
+
+		ctx := context.Background()
+		req := &domain.CompletionRequest{
+			Model: "gpt-4",
+			Messages: []domain.Message{
+				{Role: "user", Content: "Hello"},
+			},
+			Stream: true,
+		}
+
+		chunks, err := gateway.StreamByModel(ctx, req)
+
+		require.NoError(t, err)
+		require.NotNil(t, chunks)
+
+		// Read chunks
+		var receivedChunks []domain.StreamChunk
+		for chunk := range chunks {
+			receivedChunks = append(receivedChunks, chunk)
+		}
+
+		require.Len(t, receivedChunks, 2)
+		require.Equal(t, "test", receivedChunks[0].Delta)
+		require.False(t, receivedChunks[0].Done)
+		require.True(t, receivedChunks[1].Done)
+	})
+
+	t.Run("should return error when request is nil", func(t *testing.T) {
+		registry := newMockRegistry()
+		gateway := domain.NewGatewayService(registry)
+
+		ctx := context.Background()
+
+		chunks, err := gateway.StreamByModel(ctx, nil)
+
+		require.Error(t, err)
+		require.Nil(t, chunks)
+		require.Contains(t, err.Error(), "request cannot be nil")
+	})
+
+	t.Run("should return error when model is empty", func(t *testing.T) {
+		registry := newMockRegistry()
+		gateway := domain.NewGatewayService(registry)
+
+		ctx := context.Background()
+		req := &domain.CompletionRequest{
+			Model: "",
+			Messages: []domain.Message{
+				{Role: "user", Content: "Hello"},
+			},
+			Stream: true,
+		}
+
+		chunks, err := gateway.StreamByModel(ctx, req)
+
+		require.Error(t, err)
+		require.Nil(t, chunks)
+		require.Contains(t, err.Error(), "model cannot be empty")
+	})
+
+	t.Run("should return error when no provider supports model", func(t *testing.T) {
+		registry := newMockRegistry()
+		gateway := domain.NewGatewayService(registry)
+
+		provider := &mockProvider{
+			name:            "openai",
+			supportedModels: map[string]struct{}{"gpt-4": {}},
+		}
+		registry.Register(context.Background(), provider)
+
+		ctx := context.Background()
+		req := &domain.CompletionRequest{
+			Model: "unsupported-model",
+			Messages: []domain.Message{
+				{Role: "user", Content: "Hello"},
+			},
+			Stream: true,
+		}
+
+		chunks, err := gateway.StreamByModel(ctx, req)
+
+		require.Error(t, err)
+		require.Nil(t, chunks)
+		require.Contains(t, err.Error(), "provider routing failed")
+	})
+
+	t.Run("should return error when provider stream fails", func(t *testing.T) {
+		registry := newMockRegistry()
+		gateway := domain.NewGatewayService(registry)
+
+		provider := &mockProvider{
+			name: "openai",
+			streamFunc: func(_ context.Context, _ *domain.CompletionRequest) (<-chan domain.StreamChunk, error) {
+				return nil, errors.New("stream error")
+			},
+			supportedModels: map[string]struct{}{"gpt-4": {}},
+		}
+		registry.Register(context.Background(), provider)
+
+		ctx := context.Background()
+		req := &domain.CompletionRequest{
+			Model: "gpt-4",
+			Messages: []domain.Message{
+				{Role: "user", Content: "Hello"},
+			},
+			Stream: true,
+		}
+
+		chunks, err := gateway.StreamByModel(ctx, req)
+
+		require.Error(t, err)
+		require.Nil(t, chunks)
+		require.Contains(t, err.Error(), "failed to stream from provider")
 	})
 }

@@ -1,18 +1,16 @@
 # AI Gateway
 
-A microservices-based AI gateway that acts as a reverse proxy for multiple LLM providers. Currently supports OpenAI, with easy extensibility for additional providers.
+A microservices-based AI gateway that acts as a reverse proxy for multiple LLM providers.
 
 ## Architecture
 
 The AI Gateway follows clean architecture principles with clear separation of concerns:
 
-- **Domain Layer**: Provider-agnostic business logic
-- **Provider Layer**: Provider-specific adapters (OpenAI, Anthropic, etc.)
+- **Domain Layer**: Provider-agnostic business logic and gateway orchestration
+- **Provider Layer**: Provider-specific adapters and intelligent routing registry
 - **HTTP Layer**: REST API endpoints
 - **Observability**: Structured logging and event publishing
 - **Configuration**: Environment-based configuration management
-
-See [plan.md](plan.md) for detailed architecture documentation.
 
 ## Features
 
@@ -31,31 +29,28 @@ See [plan.md](plan.md) for detailed architecture documentation.
 ```
 .
 ├── cmd/
-│   └── gateway/
-│       └── main.go                 # Application entry point
+│   └── main.go                     # Application entry point
 ├── internal/
 │   ├── domain/                     # Core business logic
 │   │   ├── models.go              # Domain models
 │   │   ├── interfaces.go          # Core interfaces
-│   │   ├── gateway.go             # Gateway service
+│   │   ├── gateway.go             # Gateway service with auto-routing
 │   │   └── gateway_test.go        # Unit tests
 │   ├── provider/                   # Provider implementations
 │   │   ├── registry/
-│   │   │   ├── registry.go        # Provider registry
+│   │   │   ├── registry.go        # Provider registry with model routing
 │   │   │   └── registry_test.go   # Unit tests
 │   │   └── openai/
 │   │       ├── config.go          # OpenAI configuration
 │   │       ├── client.go          # OpenAI HTTP client
 │   │       └── adapter.go         # OpenAI adapter
-│   ├── routing/                    # Request routing
-│   │   ├── router.go
-│   │   └── router_test.go
 │   ├── http/                       # HTTP layer
 │   │   ├── handler.go             # Request handlers
 │   │   └── server.go              # HTTP server
 │   ├── observability/              # Logging and events
 │   │   ├── logger.go
-│   │   └── eventbus.go
+│   │   ├── middleware.go
+│   │   └── context.go
 │   └── config/                     # Configuration
 │       └── config.go
 └── go.mod
@@ -207,7 +202,7 @@ Run tests for a specific package:
 ```bash
 go test ./internal/domain
 go test ./internal/provider/registry
-go test ./internal/routing
+go test ./internal/config
 ```
 
 ## Development
@@ -252,8 +247,10 @@ func (p *Provider) Name() string {
     return p.name
 }
 
-func (p *Provider) SupportedModels(ctx context.Context) ([]string, error) {
-    // Implementation
+func (p *Provider) IsModelSupported(ctx context.Context, model string) bool {
+    // Return true if this provider supports the given model
+    // e.g., for Anthropic: model starts with "claude-"
+    return strings.HasPrefix(model, "claude-")
 }
 ```
 
@@ -267,16 +264,27 @@ type Config struct {
 }
 ```
 
-4. Register in DI container:
+4. Register in DI container and registry:
 ```go
-// cmd/gateway/main.go
+// cmd/main.go
+// First, provide the provider
 container.Provide(func(cfg *config.Config) (*anthropic.Provider, error) {
-    if !cfg.Anthropic.Enabled {
-        return nil, nil
+    if cfg.Anthropic.APIKey == "" {
+        return nil, ErrProviderNotConfigured
     }
     return anthropic.NewProvider(cfg.Anthropic)
 })
+
+// Then register it with the registry (in the Invoke section)
+container.Invoke(func(reg domain.ProviderRegistry, anthropicProvider *anthropic.Provider) error {
+    if anthropicProvider != nil {
+        return reg.Register(ctx, anthropicProvider)
+    }
+    return nil
+})
 ```
+
+The registry will automatically route requests to your provider based on model support.
 
 ### Code Conventions
 
@@ -301,11 +309,12 @@ Using `uber-go/dig` enables:
 - Clear dependency graph
 
 ### Why Provider Registry?
-The registry pattern allows:
+The registry pattern with integrated routing allows:
 - Dynamic provider registration
-- Runtime provider selection
-- Easy extensibility
-- No hardcoded provider lists in business logic
+- Automatic model-based provider selection via `GetByModel()`
+- Type-safe provider discovery (returns Provider interface, not strings)
+- Single source of truth for provider management
+- Eliminates unnecessary abstraction layers
 
 ### Why Event Bus?
 Publishing events instead of direct logging:

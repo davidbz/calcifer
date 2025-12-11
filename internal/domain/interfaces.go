@@ -25,17 +25,9 @@ type ProviderRegistry interface {
 	// Get retrieves a provider by name.
 	Get(ctx context.Context, providerName string) (Provider, error)
 
+	// GetByModel retrieves a provider that supports the given model.
+	GetByModel(ctx context.Context, model string) (Provider, error)
+
 	// List returns all available providers.
 	List(ctx context.Context) ([]string, error)
-}
-
-// Router determines which provider to use for a request.
-type Router interface {
-	// Route selects a provider based on request criteria.
-	Route(ctx context.Context, req *RouteRequest) (string, error)
-}
-
-// RouteRequest contains criteria for provider selection.
-type RouteRequest struct {
-	Model string
 }
