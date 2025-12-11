@@ -17,6 +17,8 @@ The AI Gateway follows clean architecture principles with clear separation of co
 ✅ Unified API for multiple LLM providers
 ✅ Automatic provider routing based on model
 ✅ Streaming support via Server-Sent Events (SSE)
+✅ CORS support with configurable policies
+✅ Composable HTTP middleware infrastructure
 ✅ Provider abstraction (no vendor lock-in)
 ✅ Dependency injection with uber-go/dig
 ✅ Structured logging with slog
@@ -46,10 +48,13 @@ The AI Gateway follows clean architecture principles with clear separation of co
 │   │       └── adapter.go         # OpenAI adapter
 │   ├── http/                       # HTTP layer
 │   │   ├── handler.go             # Request handlers
-│   │   └── server.go              # HTTP server
+│   │   ├── server.go              # HTTP server
+│   │   └── middleware/            # HTTP middlewares
+│   │       ├── middleware.go      # Core middleware types
+│   │       └── cors.go            # CORS middleware
 │   ├── observability/              # Logging and events
 │   │   ├── logger.go
-│   │   ├── middleware.go
+│   │   ├── trace.go               # Trace middleware
 │   │   └── context.go
 │   └── config/                     # Configuration
 │       └── config.go
@@ -89,6 +94,13 @@ Configure the gateway using environment variables:
 - `SERVER_PORT` - HTTP server port (default: 8080)
 - `SERVER_READ_TIMEOUT` - Read timeout in seconds (default: 30)
 - `SERVER_WRITE_TIMEOUT` - Write timeout in seconds (default: 30)
+
+#### CORS Configuration
+- `CORS_ALLOWED_ORIGINS` - Comma-separated list of allowed origins (default: *)
+- `CORS_ALLOWED_METHODS` - Comma-separated list of allowed HTTP methods (default: GET,POST,PUT,DELETE,OPTIONS)
+- `CORS_ALLOWED_HEADERS` - Comma-separated list of allowed headers (default: Content-Type,Authorization)
+- `CORS_ALLOW_CREDENTIALS` - Allow credentials (cookies, authorization headers) (default: true)
+- `CORS_MAX_AGE` - Preflight cache duration in seconds (default: 86400)
 
 #### OpenAI Configuration
 - `OPENAI_API_KEY` - OpenAI API key (required for OpenAI provider)
@@ -323,6 +335,15 @@ Publishing events instead of direct logging:
 - Makes testing easier
 - Supports metrics, tracing, and logging from a single source
 
+### Why Middleware Infrastructure?
+Composable middleware chain enables:
+- Separation of concerns (CORS, auth, tracing as independent components)
+- Explicit ordering and composition via `middleware.Chain()`
+- Easy addition of future middlewares (auth, rate limiting, metrics)
+- Type-safe middleware contracts
+- Testable in isolation
+- Follows standard Go middleware patterns
+
 ## Troubleshooting
 
 ### "Provider not found" error
@@ -355,6 +376,8 @@ MIT License - See LICENSE file for details
 
 ## Future Enhancements
 
+- [ ] Add authentication middleware (JWT/API keys)
+- [ ] Add rate limiting middleware
 - [ ] Add Anthropic provider
 - [ ] Add Google (Gemini) provider
 - [ ] Implement request/response caching

@@ -10,7 +10,6 @@ import (
 
 	"github.com/davidbz/calcifer/internal/config"
 	"github.com/davidbz/calcifer/internal/http/middleware"
-	"github.com/davidbz/calcifer/internal/observability"
 )
 
 // Server represents the HTTP server.
@@ -48,7 +47,7 @@ func (s *Server) Start() error {
 	// Order matters: CORS runs first, then trace injection.
 	chain := middleware.Chain(
 		middleware.CORS(s.corsConfig),
-		observability.Trace(),
+		middleware.Trace(),
 	)
 
 	handlerWithMiddleware := chain(mux)

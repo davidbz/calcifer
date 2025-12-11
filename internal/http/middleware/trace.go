@@ -1,30 +1,32 @@
-package observability
+package middleware
 
 import (
 	"net/http"
 
 	"go.uber.org/zap"
+
+	"github.com/davidbz/calcifer/internal/observability"
 )
 
 // Trace creates a middleware that injects trace ID and request ID into every request.
-func Trace() func(http.Handler) http.Handler {
+func Trace() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			traceID := GenerateTraceID()
-			ctx = WithTraceID(ctx, traceID)
+			traceID := observability.GenerateTraceID()
+			ctx = observability.WithTraceID(ctx, traceID)
 
-			spanID := GenerateSpanID()
-			ctx = WithSpanID(ctx, spanID)
+			spanID := observability.GenerateSpanID()
+			ctx = observability.WithSpanID(ctx, spanID)
 
-			requestID := GenerateRequestID()
-			ctx = WithRequestID(ctx, requestID)
+			requestID := observability.GenerateRequestID()
+			ctx = observability.WithRequestID(ctx, requestID)
 
 			w.Header().Set("X-Trace-Id", traceID)
 			w.Header().Set("X-Request-Id", requestID)
 
-			contextLogger := FromContext(ctx)
+			contextLogger := observability.FromContext(ctx)
 			contextLogger.Info("request started",
 				zap.String("method", r.Method),
 				zap.String("path", r.URL.Path),
