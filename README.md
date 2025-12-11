@@ -223,6 +223,65 @@ go test ./internal/provider/registry
 go test ./internal/config
 ```
 
+## Mock Generation
+
+This project uses [mockery](https://github.com/vektra/mockery) to automatically generate test mocks from interfaces.
+
+### Generating Mocks
+
+To generate or regenerate mocks after interface changes:
+
+```bash
+make mocks
+```
+
+Or directly:
+
+```bash
+mockery --config .mockery.yaml
+```
+
+### Mock Location
+
+All generated mocks are in `internal/mocks/` with the following files:
+- `provider.go` - MockProvider
+- `provider_registry.go` - MockProviderRegistry
+- `cost_calculator.go` - MockCostCalculator
+- `pricing_registry.go` - MockPricingRegistry
+
+### Using Mocks in Tests
+
+```go
+import (
+    "github.com/davidbz/calcifer/internal/mocks"
+    "github.com/stretchr/testify/mock"
+)
+
+func TestExample(t *testing.T) {
+    // Create mock with test context
+    mockProvider := mocks.NewMockProvider(t)
+
+    // Set expectations
+    mockProvider.EXPECT().Name().Return("test-provider")
+    mockProvider.EXPECT().Complete(mock.Anything, mock.AnythingOfType("*domain.CompletionRequest")).
+        Return(&domain.CompletionResponse{...}, nil)
+
+    // Use mock in test
+    // ... test code ...
+
+    // Verify expectations met
+    mockProvider.AssertExpectations(t)
+}
+```
+
+### When to Regenerate Mocks
+
+Regenerate mocks whenever you:
+- Add new methods to interfaces
+- Change method signatures
+- Add new interfaces to mock
+- Update mockery configuration
+
 ## Development
 
 ### Adding a New Provider

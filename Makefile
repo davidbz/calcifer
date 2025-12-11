@@ -1,4 +1,4 @@
-.PHONY: build test run clean help
+.PHONY: build test run clean help mocks mocks-clean mocks-regen
 
 # Build the app binary
 build:
@@ -6,8 +6,24 @@ build:
 	@go build -o bin/app ./cmd/
 	@echo "Build complete: bin/app"
 
-# Run all tests
-test:
+# Generate mocks
+mocks:
+	@echo "Generating mocks..."
+	@mockery --config .mockery.yaml
+	@echo "Mocks generated successfully"
+
+# Clean generated mocks
+mocks-clean:
+	@echo "Cleaning mocks..."
+	@rm -rf internal/mocks
+	@echo "Mocks cleaned"
+
+# Regenerate mocks (clean + generate)
+mocks-regen: mocks-clean mocks
+	@echo "Mocks regenerated"
+
+# Run all tests (generates mocks first)
+test: mocks
 	@echo "Running tests..."
 	@go test -v ./...
 
@@ -50,11 +66,14 @@ lint:
 help:
 	@echo "Available targets:"
 	@echo "  build         - Build the app binary"
-	@echo "  test          - Run all tests"
+	@echo "  test          - Run all tests (generates mocks first)"
 	@echo "  test-coverage - Run tests with coverage report"
 	@echo "  run           - Run the app"
 	@echo "  clean         - Clean build artifacts"
 	@echo "  deps          - Install dependencies"
 	@echo "  fmt           - Format code"
 	@echo "  lint          - Lint code (requires golangci-lint)"
+	@echo "  mocks         - Generate mocks from interfaces"
+	@echo "  mocks-clean   - Remove generated mocks"
+	@echo "  mocks-regen   - Clean and regenerate all mocks"
 	@echo "  help          - Show this help message"

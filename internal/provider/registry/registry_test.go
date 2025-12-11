@@ -4,61 +4,23 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/davidbz/calcifer/internal/domain"
+	"github.com/davidbz/calcifer/internal/mocks"
 	"github.com/davidbz/calcifer/internal/provider/registry"
 )
-
-// mockProvider is a mock implementation of domain.Provider for testing.
-type mockProvider struct {
-	name string
-}
-
-func (m *mockProvider) Complete(_ context.Context, _ *domain.CompletionRequest) (*domain.CompletionResponse, error) {
-	return &domain.CompletionResponse{}, nil
-}
-
-func (m *mockProvider) Stream(_ context.Context, _ *domain.CompletionRequest) (<-chan domain.StreamChunk, error) {
-	ch := make(chan domain.StreamChunk)
-	close(ch)
-	return ch, nil
-}
-
-func (m *mockProvider) Name() string {
-	return m.name
-}
-
-func (m *mockProvider) IsModelSupported(_ context.Context, model string) bool {
-	// Simple mock: provider supports models prefixed with its name
-	// e.g., "openai" provider supports "openai-gpt-4"
-	if m.name == "openai" && (model == "gpt-4" || model == "gpt-3.5-turbo") {
-		return true
-	}
-	if m.name == "anthropic" && (model == "claude-2" || model == "claude-instant") {
-		return true
-	}
-	return false
-}
-
-func (m *mockProvider) SupportedModels(_ context.Context) []string {
-	if m.name == "openai" {
-		return []string{"gpt-4", "gpt-3.5-turbo"}
-	}
-	if m.name == "anthropic" {
-		return []string{"claude-2", "claude-instant"}
-	}
-	return []string{}
-}
 
 func TestRegistry_Register(t *testing.T) {
 	t.Run("should register provider successfully", func(t *testing.T) {
 		reg := registry.NewRegistry()
 		ctx := context.Background()
 
-		provider := &mockProvider{name: "test-provider"}
+		mockProvider := mocks.NewMockProvider(t)
+		mockProvider.EXPECT().Name().Return("test-provider")
+		mockProvider.EXPECT().SupportedModels(mock.Anything).Return([]string{})
 
-		err := reg.Register(ctx, provider)
+		err := reg.Register(ctx, mockProvider)
 		require.NoError(t, err)
 
 		// Verify provider was registered
@@ -81,9 +43,10 @@ func TestRegistry_Register(t *testing.T) {
 		reg := registry.NewRegistry()
 		ctx := context.Background()
 
-		provider := &mockProvider{name: ""}
+		mockProvider := mocks.NewMockProvider(t)
+		mockProvider.EXPECT().Name().Return("")
 
-		err := reg.Register(ctx, provider)
+		err := reg.Register(ctx, mockProvider)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "provider name cannot be empty")
 	})
@@ -92,13 +55,16 @@ func TestRegistry_Register(t *testing.T) {
 		reg := registry.NewRegistry()
 		ctx := context.Background()
 
-		provider1 := &mockProvider{name: "test-provider"}
-		provider2 := &mockProvider{name: "test-provider"}
+		mockProvider1 := mocks.NewMockProvider(t)
+		mockProvider1.EXPECT().Name().Return("test-provider")
+		mockProvider1.EXPECT().SupportedModels(mock.Anything).Return([]string{})
+		mockProvider2 := mocks.NewMockProvider(t)
+		mockProvider2.EXPECT().Name().Return("test-provider")
 
-		err := reg.Register(ctx, provider1)
+		err := reg.Register(ctx, mockProvider1)
 		require.NoError(t, err)
 
-		err = reg.Register(ctx, provider2)
+		err = reg.Register(ctx, mockProvider2)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "already registered")
 	})
@@ -109,8 +75,11 @@ func TestRegistry_Get(t *testing.T) {
 		reg := registry.NewRegistry()
 		ctx := context.Background()
 
-		provider := &mockProvider{name: "test-provider"}
-		err := reg.Register(ctx, provider)
+		mockProvider := mocks.NewMockProvider(t)
+		mockProvider.EXPECT().Name().Return("test-provider")
+		mockProvider.EXPECT().SupportedModels(mock.Anything).Return([]string{})
+
+		err := reg.Register(ctx, mockProvider)
 		require.NoError(t, err)
 
 		retrieved, err := reg.Get(ctx, "test-provider")
@@ -153,17 +122,23 @@ func TestRegistry_List(t *testing.T) {
 		reg := registry.NewRegistry()
 		ctx := context.Background()
 
-		provider1 := &mockProvider{name: "provider1"}
-		provider2 := &mockProvider{name: "provider2"}
-		provider3 := &mockProvider{name: "provider3"}
+		mockProvider1 := mocks.NewMockProvider(t)
+		mockProvider1.EXPECT().Name().Return("provider1")
+		mockProvider1.EXPECT().SupportedModels(mock.Anything).Return([]string{})
+		mockProvider2 := mocks.NewMockProvider(t)
+		mockProvider2.EXPECT().Name().Return("provider2")
+		mockProvider2.EXPECT().SupportedModels(mock.Anything).Return([]string{})
+		mockProvider3 := mocks.NewMockProvider(t)
+		mockProvider3.EXPECT().Name().Return("provider3")
+		mockProvider3.EXPECT().SupportedModels(mock.Anything).Return([]string{})
 
-		err := reg.Register(ctx, provider1)
+		err := reg.Register(ctx, mockProvider1)
 		require.NoError(t, err)
 
-		err = reg.Register(ctx, provider2)
+		err = reg.Register(ctx, mockProvider2)
 		require.NoError(t, err)
 
-		err = reg.Register(ctx, provider3)
+		err = reg.Register(ctx, mockProvider3)
 		require.NoError(t, err)
 
 		providers, err := reg.List(ctx)
@@ -185,8 +160,10 @@ func TestRegistry_Concurrent(t *testing.T) {
 		// Register providers concurrently
 		for i := range 10 {
 			go func(idx int) {
-				provider := &mockProvider{name: string(rune('a' + idx))}
-				reg.Register(ctx, provider)
+				mockProvider := mocks.NewMockProvider(t)
+				mockProvider.EXPECT().Name().Return(string(rune('a' + idx)))
+				mockProvider.EXPECT().SupportedModels(mock.Anything).Return([]string{}).Maybe()
+				reg.Register(ctx, mockProvider)
 				done <- true
 			}(i)
 		}
@@ -207,13 +184,18 @@ func TestRegistry_GetByModel(t *testing.T) {
 		reg := registry.NewRegistry()
 		ctx := context.Background()
 
-		openaiProvider := &mockProvider{name: "openai"}
-		anthropicProvider := &mockProvider{name: "anthropic"}
+		mockOpenAI := mocks.NewMockProvider(t)
+		mockOpenAI.EXPECT().Name().Return("openai")
+		mockOpenAI.EXPECT().SupportedModels(mock.Anything).Return([]string{"gpt-4", "gpt-3.5-turbo"})
 
-		err := reg.Register(ctx, openaiProvider)
+		mockAnthropic := mocks.NewMockProvider(t)
+		mockAnthropic.EXPECT().Name().Return("anthropic")
+		mockAnthropic.EXPECT().SupportedModels(mock.Anything).Return([]string{"claude-2", "claude-instant"})
+
+		err := reg.Register(ctx, mockOpenAI)
 		require.NoError(t, err)
 
-		err = reg.Register(ctx, anthropicProvider)
+		err = reg.Register(ctx, mockAnthropic)
 		require.NoError(t, err)
 
 		// Test OpenAI model
@@ -242,8 +224,12 @@ func TestRegistry_GetByModel(t *testing.T) {
 		reg := registry.NewRegistry()
 		ctx := context.Background()
 
-		openaiProvider := &mockProvider{name: "openai"}
-		err := reg.Register(ctx, openaiProvider)
+		mockOpenAI := mocks.NewMockProvider(t)
+		mockOpenAI.EXPECT().Name().Return("openai")
+		mockOpenAI.EXPECT().SupportedModels(mock.Anything).Return([]string{"gpt-4", "gpt-3.5-turbo"})
+		mockOpenAI.EXPECT().IsModelSupported(mock.Anything, "unsupported-model").Return(false)
+
+		err := reg.Register(ctx, mockOpenAI)
 		require.NoError(t, err)
 
 		_, err = reg.GetByModel(ctx, "unsupported-model")
@@ -266,14 +252,18 @@ func TestRegistry_GetByModel(t *testing.T) {
 
 		// Register multiple providers with different models
 		for i := range 10 {
-			provider := &mockProvider{name: "provider-" + string(rune('a'+i))}
-			err := reg.Register(ctx, provider)
+			mockProvider := mocks.NewMockProvider(t)
+			mockProvider.EXPECT().Name().Return("provider-" + string(rune('a'+i)))
+			mockProvider.EXPECT().SupportedModels(mock.Anything).Return([]string{})
+			err := reg.Register(ctx, mockProvider)
 			require.NoError(t, err)
 		}
 
 		// Register the target provider
-		targetProvider := &mockProvider{name: "openai"}
-		err := reg.Register(ctx, targetProvider)
+		mockOpenAI := mocks.NewMockProvider(t)
+		mockOpenAI.EXPECT().Name().Return("openai")
+		mockOpenAI.EXPECT().SupportedModels(mock.Anything).Return([]string{"gpt-4", "gpt-3.5-turbo"})
+		err := reg.Register(ctx, mockOpenAI)
 		require.NoError(t, err)
 
 		// Perform many lookups - should be fast with O(1) reverse index

@@ -1,0 +1,20 @@
+quiet: false
+with-expecter: true
+dir: "internal/mocks"
+filename: "{{.InterfaceName | snakecase}}.go"
+outpkg: mocks
+packages:
+  github.com/davidbz/calcifer/internal/domain:
+    interfaces:
+      Provider:
+        config:
+          with-expecter: true
+      ProviderRegistry:
+        config:
+          with-expecter: true
+      CostCalculator:
+        config:
+          with-expecter: true
+      PricingRegistry:
+        config:
+          with-expecter: true
