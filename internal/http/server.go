@@ -6,9 +6,10 @@ import (
 	"net/http"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/davidbz/calcifer/internal/config"
 	"github.com/davidbz/calcifer/internal/observability"
-	"go.uber.org/zap"
 )
 
 // Server represents the HTTP server.

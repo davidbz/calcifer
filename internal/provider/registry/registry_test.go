@@ -4,9 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/davidbz/calcifer/internal/domain"
 	"github.com/davidbz/calcifer/internal/provider/registry"
-	"github.com/stretchr/testify/require"
 )
 
 // mockProvider is a mock implementation of domain.Provider for testing.

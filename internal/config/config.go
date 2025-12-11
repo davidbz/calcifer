@@ -14,16 +14,16 @@ type Config struct {
 
 // ServerConfig contains HTTP server settings.
 type ServerConfig struct {
-	Port         int `env:"SERVER_PORT" envDefault:"8080"`
-	ReadTimeout  int `env:"SERVER_READ_TIMEOUT" envDefault:"30"`
+	Port         int `env:"SERVER_PORT"          envDefault:"8080"`
+	ReadTimeout  int `env:"SERVER_READ_TIMEOUT"  envDefault:"30"`
 	WriteTimeout int `env:"SERVER_WRITE_TIMEOUT" envDefault:"30"`
 }
 
 // OpenAIConfig contains OpenAI provider settings.
 type OpenAIConfig struct {
 	APIKey     string `env:"OPENAI_API_KEY"`
-	BaseURL    string `env:"OPENAI_BASE_URL" envDefault:"https://api.openai.com/v1"`
-	Timeout    int    `env:"OPENAI_TIMEOUT" envDefault:"60"`
+	BaseURL    string `env:"OPENAI_BASE_URL"    envDefault:"https://api.openai.com/v1"`
+	Timeout    int    `env:"OPENAI_TIMEOUT"     envDefault:"60"`
 	MaxRetries int    `env:"OPENAI_MAX_RETRIES" envDefault:"3"`
 }
 

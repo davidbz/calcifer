@@ -4,8 +4,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/davidbz/calcifer/internal/config"
 	"github.com/stretchr/testify/require"
+
+	"github.com/davidbz/calcifer/internal/config"
 )
 
 func TestLoad(t *testing.T) {

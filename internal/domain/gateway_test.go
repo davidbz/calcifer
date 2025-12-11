@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davidbz/calcifer/internal/domain"
 	"github.com/stretchr/testify/require"
+
+	"github.com/davidbz/calcifer/internal/domain"
 )
 
 // mockRegistry is a mock implementation of ProviderRegistry for testing.

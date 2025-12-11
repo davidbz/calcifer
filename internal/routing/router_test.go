@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/davidbz/calcifer/internal/domain"
 	"github.com/davidbz/calcifer/internal/routing"
-	"github.com/stretchr/testify/require"
 )
 
 // mockRegistry is a mock implementation of ProviderRegistry for testing.

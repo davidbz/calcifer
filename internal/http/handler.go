@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"net/http"
 
+	"go.uber.org/zap"
+
 	"github.com/davidbz/calcifer/internal/domain"
 	"github.com/davidbz/calcifer/internal/observability"
-	"go.uber.org/zap"
 )
 
 // Handler handles HTTP requests.
