@@ -6,10 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/davidbz/calcifer/internal/config"
 	"github.com/davidbz/calcifer/internal/http/middleware"
+	"github.com/davidbz/calcifer/internal/observability"
 )
 
 // Server represents the HTTP server.
@@ -17,7 +16,6 @@ type Server struct {
 	config      config.ServerConfig
 	handler     *Handler
 	middlewares middleware.Middleware
-	logger      *zap.Logger
 }
 
 // NewServer creates a new HTTP server.
@@ -25,13 +23,11 @@ func NewServer(
 	cfg *config.Config,
 	handler *Handler,
 	middlewares middleware.Middleware,
-	logger *zap.Logger,
 ) *Server {
 	return &Server{
 		config:      cfg.Server,
 		handler:     handler,
 		middlewares: middlewares,
-		logger:      logger,
 	}
 }
 
@@ -54,7 +50,8 @@ func (s *Server) Start() error {
 		WriteTimeout: time.Duration(s.config.WriteTimeout) * time.Second,
 	}
 
-	s.logger.Info("starting HTTP server", zap.Int("port", s.config.Port))
+	ctx := context.Background()
+	observability.FromContext(ctx).Info("starting HTTP server", observability.Int("port", s.config.Port))
 
 	if err := srv.ListenAndServe(); err != nil {
 		return fmt.Errorf("server failed: %w", err)
@@ -63,7 +60,7 @@ func (s *Server) Start() error {
 }
 
 // Shutdown gracefully shuts down the server.
-func (s *Server) Shutdown(_ context.Context) error {
-	s.logger.Info("shutting down HTTP server")
+func (s *Server) Shutdown(ctx context.Context) error {
+	observability.FromContext(ctx).Info("shutting down HTTP server")
 	return nil
 }

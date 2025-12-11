@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/davidbz/calcifer/internal/domain"
 	"github.com/davidbz/calcifer/internal/observability"
 )
@@ -71,13 +69,13 @@ func (p *Provider) Complete(ctx context.Context, req *domain.CompletionRequest) 
 	// Call OpenAI API.
 	resp, err := p.client.Complete(ctx, openAIReq)
 	if err != nil {
-		logger.Error("OpenAI API call failed", zap.Error(err))
+		logger.Error("OpenAI API call failed", observability.Error(err))
 		return nil, fmt.Errorf("OpenAI API call failed: %w", err)
 	}
 
 	logger.Debug("OpenAI API call succeeded",
-		zap.Int("prompt_tokens", resp.Usage.PromptTokens),
-		zap.Int("completion_tokens", resp.Usage.CompletionTokens),
+		observability.Int("prompt_tokens", resp.Usage.PromptTokens),
+		observability.Int("completion_tokens", resp.Usage.CompletionTokens),
 	)
 
 	// Convert OpenAI response to domain response.
@@ -99,7 +97,7 @@ func (p *Provider) Stream(ctx context.Context, req *domain.CompletionRequest) (<
 	// Call OpenAI streaming API.
 	clientChunks, err := p.client.Stream(ctx, openAIReq)
 	if err != nil {
-		logger.Error("OpenAI stream call failed", zap.Error(err))
+		logger.Error("OpenAI stream call failed", observability.Error(err))
 		return nil, fmt.Errorf("OpenAI stream call failed: %w", err)
 	}
 

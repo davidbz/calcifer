@@ -3,8 +3,6 @@ package middleware
 import (
 	"net/http"
 
-	"go.uber.org/zap"
-
 	"github.com/davidbz/calcifer/internal/observability"
 )
 
@@ -28,9 +26,9 @@ func Trace() Middleware {
 
 			contextLogger := observability.FromContext(ctx)
 			contextLogger.Info("request started",
-				zap.String("method", r.Method),
-				zap.String("path", r.URL.Path),
-				zap.String("remote_addr", r.RemoteAddr),
+				observability.String("method", r.Method),
+				observability.String("path", r.URL.Path),
+				observability.String("remote_addr", r.RemoteAddr),
 			)
 
 			next.ServeHTTP(w, r.WithContext(ctx))

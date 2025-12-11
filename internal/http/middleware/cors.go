@@ -18,6 +18,7 @@ func CORS(cfg *config.CORSConfig) Middleware {
 		}
 	}
 
+	//nolint:exhaustruct // Third-party struct with many optional fields
 	c := cors.New(cors.Options{
 		AllowedOrigins:   cfg.AllowedOrigins,
 		AllowedMethods:   cfg.AllowedMethods,

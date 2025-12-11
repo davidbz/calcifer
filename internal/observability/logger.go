@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"go.uber.org/zap"
+	"go.uber.org/zap" //nolint:depguard // This is the logger abstraction layer
 )
 
 const (
@@ -77,3 +77,19 @@ func FromContext(ctx context.Context) *zap.Logger {
 
 	return logger.With(fields...)
 }
+
+// Re-export zap field constructors for use in application code.
+// This allows structured logging without direct zap dependency.
+//
+//nolint:gochecknoglobals // Re-exported functions for logging abstraction
+var (
+	String   = zap.String
+	Int      = zap.Int
+	Int64    = zap.Int64
+	Float64  = zap.Float64
+	Bool     = zap.Bool
+	Error    = zap.Error
+	Duration = zap.Duration
+	Time     = zap.Time
+	Any      = zap.Any
+)

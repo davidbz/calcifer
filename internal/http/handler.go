@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"go.uber.org/zap"
-
 	"github.com/davidbz/calcifer/internal/domain"
 	"github.com/davidbz/calcifer/internal/observability"
 )
@@ -51,8 +49,8 @@ func (h *Handler) HandleCompletion(w http.ResponseWriter, r *http.Request) {
 
 	logger := observability.FromContext(ctx)
 	logger.Info("completion request received",
-		zap.String("model", req.Model),
-		zap.Bool("stream", req.Stream),
+		observability.String("model", req.Model),
+		observability.Bool("stream", req.Stream),
 	)
 
 	// Handle streaming vs non-streaming.
@@ -64,20 +62,20 @@ func (h *Handler) HandleCompletion(w http.ResponseWriter, r *http.Request) {
 	// Non-streaming response.
 	response, execErr := h.gateway.CompleteByModel(ctx, &req)
 	if execErr != nil {
-		logger.Error("completion failed", zap.Error(execErr))
+		logger.Error("completion failed", observability.Error(execErr))
 		http.Error(w, execErr.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	logger.Info("completion succeeded",
-		zap.Int("tokens", response.Usage.TotalTokens),
-		zap.Float64("cost", response.Usage.Cost),
+		observability.Int("tokens", response.Usage.TotalTokens),
+		observability.Float64("cost", response.Usage.Cost),
 	)
 
 	w.Header().Set("Content-Type", "application/json")
 	encodeErr := json.NewEncoder(w).Encode(response)
 	if encodeErr != nil {
-		logger.Error("failed to encode response", zap.Error(encodeErr))
+		logger.Error("failed to encode response", observability.Error(encodeErr))
 		http.Error(w, fmt.Sprintf("failed to encode response: %v", encodeErr), http.StatusInternalServerError)
 		return
 	}
@@ -98,7 +96,7 @@ func (h *Handler) handleStreamByModel(
 
 	chunks, err := h.gateway.StreamByModel(ctx, req)
 	if err != nil {
-		logger.Error("stream failed", zap.Error(err))
+		logger.Error("stream failed", observability.Error(err))
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -112,7 +110,7 @@ func (h *Handler) handleStreamByModel(
 
 	for chunk := range chunks {
 		if chunk.Error != nil {
-			logger.Error("stream chunk error", zap.Error(chunk.Error))
+			logger.Error("stream chunk error", observability.Error(chunk.Error))
 			// Send error as event.
 			fmt.Fprintf(w, "event: error\ndata: %s\n\n", chunk.Error.Error())
 			flusher.Flush()
