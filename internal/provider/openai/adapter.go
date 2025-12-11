@@ -11,6 +11,23 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	// GPT-4 pricing per 1K tokens
+	gpt4InputCostPer1K  = 0.03
+	gpt4OutputCostPer1K = 0.06
+
+	// GPT-4 Turbo pricing per 1K tokens
+	gpt4TurboInputCostPer1K  = 0.01
+	gpt4TurboOutputCostPer1K = 0.03
+
+	// GPT-3.5 Turbo pricing per 1K tokens
+	gpt35TurboInputCostPer1K  = 0.0005
+	gpt35TurboOutputCostPer1K = 0.0015
+
+	// Token conversion factor (tokens to per-1K)
+	tokensToPerK = 1000.0
+)
+
 // ModelConfig contains model configuration including pricing.
 type ModelConfig struct {
 	Supported       bool
@@ -120,18 +137,18 @@ func (p *Provider) getModelConfig(model string) ModelConfig {
 	modelConfigs := map[string]ModelConfig{
 		"gpt-4": {
 			Supported:       true,
-			InputCostPer1K:  0.03,
-			OutputCostPer1K: 0.06,
+			InputCostPer1K:  gpt4InputCostPer1K,
+			OutputCostPer1K: gpt4OutputCostPer1K,
 		},
 		"gpt-4-turbo": {
 			Supported:       true,
-			InputCostPer1K:  0.01,
-			OutputCostPer1K: 0.03,
+			InputCostPer1K:  gpt4TurboInputCostPer1K,
+			OutputCostPer1K: gpt4TurboOutputCostPer1K,
 		},
 		"gpt-3.5-turbo": {
 			Supported:       true,
-			InputCostPer1K:  0.0005,
-			OutputCostPer1K: 0.0015,
+			InputCostPer1K:  gpt35TurboInputCostPer1K,
+			OutputCostPer1K: gpt35TurboOutputCostPer1K,
 		},
 	}
 
@@ -175,8 +192,8 @@ func (p *Provider) toDomainResponse(resp *openAIResponse) *domain.CompletionResp
 
 	// Calculate cost based on token usage and model pricing
 	modelConfig := p.getModelConfig(resp.Model)
-	inputCost := float64(resp.Usage.PromptTokens) / 1000.0 * modelConfig.InputCostPer1K
-	outputCost := float64(resp.Usage.CompletionTokens) / 1000.0 * modelConfig.OutputCostPer1K
+	inputCost := float64(resp.Usage.PromptTokens) / tokensToPerK * modelConfig.InputCostPer1K
+	outputCost := float64(resp.Usage.CompletionTokens) / tokensToPerK * modelConfig.OutputCostPer1K
 	totalCost := inputCost + outputCost
 
 	return &domain.CompletionResponse{

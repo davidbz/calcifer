@@ -11,6 +11,11 @@ import (
 type contextKey string
 
 const (
+	traceIDBytes = 16 // OpenTelemetry trace ID size in bytes
+	spanIDBytes  = 8  // OpenTelemetry span ID size in bytes
+)
+
+const (
 	// TraceIDKey holds the OpenTelemetry trace ID.
 	TraceIDKey contextKey = "trace_id"
 
@@ -94,7 +99,7 @@ func GetModel(ctx context.Context) string {
 
 // GenerateTraceID generates an OpenTelemetry-compatible trace ID (32 hex chars).
 func GenerateTraceID() string {
-	bytes := make([]byte, 16)
+	bytes := make([]byte, traceIDBytes)
 	if _, err := rand.Read(bytes); err != nil {
 		return uuid.New().String()
 	}
@@ -103,7 +108,7 @@ func GenerateTraceID() string {
 
 // GenerateSpanID generates an OpenTelemetry-compatible span ID (16 hex chars).
 func GenerateSpanID() string {
-	bytes := make([]byte, 8)
+	bytes := make([]byte, spanIDBytes)
 	if _, err := rand.Read(bytes); err != nil {
 		return uuid.New().String()[:16]
 	}

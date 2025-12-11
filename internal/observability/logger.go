@@ -7,7 +7,10 @@ import (
 	"go.uber.org/zap"
 )
 
-const loggerKey contextKey = "logger"
+const (
+	loggerKey              contextKey = "logger"
+	maxLoggerFieldCapacity int        = 5 // Maximum number of context fields to add to logger
+)
 
 // InitLogger initializes the base logger (called once at startup).
 func InitLogger() (*zap.Logger, error) {
@@ -30,7 +33,7 @@ func FromContext(ctx context.Context) *zap.Logger {
 		logger, _ = zap.NewProduction()
 	}
 
-	fields := make([]zap.Field, 0, 5)
+	fields := make([]zap.Field, 0, maxLoggerFieldCapacity)
 
 	if traceID := GetTraceID(ctx); traceID != "" {
 		fields = append(fields, zap.String("trace_id", traceID))
