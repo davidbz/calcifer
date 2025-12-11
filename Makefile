@@ -1,10 +1,10 @@
 .PHONY: build test run clean help
 
-# Build the gateway binary
+# Build the app binary
 build:
-	@echo "Building gateway..."
-	@go build -o bin/gateway ./cmd/gateway
-	@echo "Build complete: bin/gateway"
+	@echo "Building..."
+	@go build -o bin/app ./cmd/
+	@echo "Build complete: bin/app"
 
 # Run all tests
 test:
@@ -18,10 +18,10 @@ test-coverage:
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 
-# Run the gateway
+# Run the app
 run:
-	@echo "Starting gateway..."
-	@go run ./cmd/gateway
+	@echo "Starting..."
+	@go run ./cmd/
 
 # Clean build artifacts
 clean:
@@ -49,10 +49,10 @@ lint:
 # Help
 help:
 	@echo "Available targets:"
-	@echo "  build         - Build the gateway binary"
+	@echo "  build         - Build the app binary"
 	@echo "  test          - Run all tests"
 	@echo "  test-coverage - Run tests with coverage report"
-	@echo "  run           - Run the gateway"
+	@echo "  run           - Run the app"
 	@echo "  clean         - Clean build artifacts"
 	@echo "  deps          - Install dependencies"
 	@echo "  fmt           - Format code"
