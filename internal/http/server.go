@@ -9,22 +9,30 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/davidbz/calcifer/internal/config"
+	"github.com/davidbz/calcifer/internal/http/middleware"
 	"github.com/davidbz/calcifer/internal/observability"
 )
 
 // Server represents the HTTP server.
 type Server struct {
-	config  config.ServerConfig
-	handler *Handler
-	logger  *zap.Logger
+	config     config.ServerConfig
+	corsConfig *config.CORSConfig
+	handler    *Handler
+	logger     *zap.Logger
 }
 
 // NewServer creates a new HTTP server.
-func NewServer(cfg *config.Config, handler *Handler, logger *zap.Logger) *Server {
+func NewServer(
+	cfg *config.Config,
+	corsConfig *config.CORSConfig,
+	handler *Handler,
+	logger *zap.Logger,
+) *Server {
 	return &Server{
-		config:  cfg.Server,
-		handler: handler,
-		logger:  logger,
+		config:     cfg.Server,
+		corsConfig: corsConfig,
+		handler:    handler,
+		logger:     logger,
 	}
 }
 
@@ -36,13 +44,19 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/v1/completions", s.handler.HandleCompletion)
 	mux.HandleFunc("/health", s.handler.HandleHealth)
 
-	// Wrap with TraceMiddleware to inject trace IDs into context.
-	handlerWithTrace := observability.TraceMiddleware()(mux)
+	// Compose middleware chain: CORS -> Trace.
+	// Order matters: CORS runs first, then trace injection.
+	chain := middleware.Chain(
+		middleware.CORS(s.corsConfig),
+		observability.Trace(),
+	)
+
+	handlerWithMiddleware := chain(mux)
 
 	// Create server with timeouts.
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.config.Port),
-		Handler:      handlerWithTrace,
+		Handler:      handlerWithMiddleware,
 		ReadTimeout:  time.Duration(s.config.ReadTimeout) * time.Second,
 		WriteTimeout: time.Duration(s.config.WriteTimeout) * time.Second,
 	}

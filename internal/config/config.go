@@ -9,6 +9,7 @@ import (
 // Config represents the gateway configuration.
 type Config struct {
 	Server ServerConfig
+	CORS   CORSConfig
 	OpenAI OpenAIConfig
 }
 
@@ -17,6 +18,15 @@ type ServerConfig struct {
 	Port         int `env:"SERVER_PORT"          envDefault:"8080"`
 	ReadTimeout  int `env:"SERVER_READ_TIMEOUT"  envDefault:"30"`
 	WriteTimeout int `env:"SERVER_WRITE_TIMEOUT" envDefault:"30"`
+}
+
+// CORSConfig contains CORS policy settings.
+type CORSConfig struct {
+	AllowedOrigins   []string `env:"CORS_ALLOWED_ORIGINS"   envSeparator:"," envDefault:"*"`
+	AllowedMethods   []string `env:"CORS_ALLOWED_METHODS"   envSeparator:"," envDefault:"GET,POST,PUT,DELETE,OPTIONS"`
+	AllowedHeaders   []string `env:"CORS_ALLOWED_HEADERS"   envSeparator:"," envDefault:"Content-Type,Authorization"`
+	AllowCredentials bool     `env:"CORS_ALLOW_CREDENTIALS" envDefault:"true"`
+	MaxAge           int      `env:"CORS_MAX_AGE"           envDefault:"86400"`
 }
 
 // OpenAIConfig contains OpenAI provider settings.
@@ -31,6 +41,7 @@ type OpenAIConfig struct {
 type DepConfig struct {
 	dig.Out
 	*ServerConfig
+	*CORSConfig
 	*OpenAIConfig
 }
 
@@ -53,6 +64,7 @@ func ParseDependenciesConfig(cfg *Config) DepConfig {
 	return DepConfig{
 		dig.Out{},
 		&cfg.Server,
+		&cfg.CORS,
 		&cfg.OpenAI,
 	}
 }
