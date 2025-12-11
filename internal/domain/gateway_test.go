@@ -103,7 +103,9 @@ func TestGatewayService_Complete(t *testing.T) {
 		mockRegistry := mocks.NewMockProviderRegistry(t)
 		mockCostCalc := mocks.NewMockCostCalculator(t)
 
-		mockRegistry.EXPECT().Get(mock.Anything, "nonexistent").Return(nil, errors.New("provider not found: nonexistent"))
+		mockRegistry.EXPECT().
+			Get(mock.Anything, "nonexistent").
+			Return(nil, errors.New("provider not found: nonexistent"))
 
 		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
 
@@ -132,7 +134,9 @@ func TestGatewayService_Complete(t *testing.T) {
 		mockCostCalc := mocks.NewMockCostCalculator(t)
 		mockProvider := mocks.NewMockProvider(t)
 
-		mockProvider.EXPECT().Complete(mock.Anything, mock.AnythingOfType("*domain.CompletionRequest")).Return(nil, errors.New("provider error"))
+		mockProvider.EXPECT().
+			Complete(mock.Anything, mock.AnythingOfType("*domain.CompletionRequest")).
+			Return(nil, errors.New("provider error"))
 		mockRegistry.EXPECT().Get(mock.Anything, "test-provider").Return(mockProvider, nil)
 
 		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
@@ -170,7 +174,9 @@ func TestGatewayService_Stream(t *testing.T) {
 		ch <- domain.StreamChunk{Done: true}
 		close(ch)
 
-		mockProvider.EXPECT().Stream(mock.Anything, mock.AnythingOfType("*domain.CompletionRequest")).Return((<-chan domain.StreamChunk)(ch), nil)
+		mockProvider.EXPECT().
+			Stream(mock.Anything, mock.AnythingOfType("*domain.CompletionRequest")).
+			Return((<-chan domain.StreamChunk)(ch), nil)
 		mockRegistry.EXPECT().Get(mock.Anything, "test-provider").Return(mockProvider, nil)
 
 		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
@@ -246,7 +252,9 @@ func TestGatewayService_Stream(t *testing.T) {
 		mockRegistry := mocks.NewMockProviderRegistry(t)
 		mockCostCalc := mocks.NewMockCostCalculator(t)
 
-		mockRegistry.EXPECT().Get(mock.Anything, "nonexistent").Return(nil, errors.New("provider not found: nonexistent"))
+		mockRegistry.EXPECT().
+			Get(mock.Anything, "nonexistent").
+			Return(nil, errors.New("provider not found: nonexistent"))
 
 		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
 
@@ -354,7 +362,9 @@ func TestGatewayService_CompleteByModel(t *testing.T) {
 		mockRegistry := mocks.NewMockProviderRegistry(t)
 		mockCostCalc := mocks.NewMockCostCalculator(t)
 
-		mockRegistry.EXPECT().GetByModel(mock.Anything, "unsupported-model").Return(nil, errors.New("no provider supports model: unsupported-model"))
+		mockRegistry.EXPECT().
+			GetByModel(mock.Anything, "unsupported-model").
+			Return(nil, errors.New("no provider supports model: unsupported-model"))
 
 		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
 
@@ -380,7 +390,9 @@ func TestGatewayService_CompleteByModel(t *testing.T) {
 		mockProvider := mocks.NewMockProvider(t)
 
 		mockRegistry.EXPECT().GetByModel(mock.Anything, "gpt-4").Return(mockProvider, nil)
-		mockProvider.EXPECT().Complete(mock.Anything, mock.AnythingOfType("*domain.CompletionRequest")).Return(nil, errors.New("provider error"))
+		mockProvider.EXPECT().
+			Complete(mock.Anything, mock.AnythingOfType("*domain.CompletionRequest")).
+			Return(nil, errors.New("provider error"))
 
 		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
 
@@ -414,7 +426,9 @@ func TestGatewayService_StreamByModel(t *testing.T) {
 		close(ch)
 
 		mockRegistry.EXPECT().GetByModel(mock.Anything, "gpt-4").Return(mockProvider, nil)
-		mockProvider.EXPECT().Stream(mock.Anything, mock.AnythingOfType("*domain.CompletionRequest")).Return((<-chan domain.StreamChunk)(ch), nil)
+		mockProvider.EXPECT().
+			Stream(mock.Anything, mock.AnythingOfType("*domain.CompletionRequest")).
+			Return((<-chan domain.StreamChunk)(ch), nil)
 
 		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
 
@@ -485,7 +499,9 @@ func TestGatewayService_StreamByModel(t *testing.T) {
 		mockRegistry := mocks.NewMockProviderRegistry(t)
 		mockCostCalc := mocks.NewMockCostCalculator(t)
 
-		mockRegistry.EXPECT().GetByModel(mock.Anything, "unsupported-model").Return(nil, errors.New("no provider supports model: unsupported-model"))
+		mockRegistry.EXPECT().
+			GetByModel(mock.Anything, "unsupported-model").
+			Return(nil, errors.New("no provider supports model: unsupported-model"))
 
 		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
 
@@ -512,7 +528,9 @@ func TestGatewayService_StreamByModel(t *testing.T) {
 		mockProvider := mocks.NewMockProvider(t)
 
 		mockRegistry.EXPECT().GetByModel(mock.Anything, "gpt-4").Return(mockProvider, nil)
-		mockProvider.EXPECT().Stream(mock.Anything, mock.AnythingOfType("*domain.CompletionRequest")).Return(nil, errors.New("stream error"))
+		mockProvider.EXPECT().
+			Stream(mock.Anything, mock.AnythingOfType("*domain.CompletionRequest")).
+			Return(nil, errors.New("stream error"))
 
 		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc)
 

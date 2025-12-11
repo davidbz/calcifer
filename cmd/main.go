@@ -13,6 +13,7 @@ import (
 	"github.com/davidbz/calcifer/internal/http"
 	"github.com/davidbz/calcifer/internal/http/middleware"
 	"github.com/davidbz/calcifer/internal/observability"
+	"github.com/davidbz/calcifer/internal/provider/echo"
 	"github.com/davidbz/calcifer/internal/provider/openai"
 	"github.com/davidbz/calcifer/internal/provider/registry"
 )
@@ -40,6 +41,7 @@ func buildContainer() *dig.Container {
 	provideObservability(container)
 	provideRegistries(container)
 	provideCostCalculator(container)
+	provideEcho(container)
 	provideOpenAI(container)
 	registerProviders(container)
 	registerPricing(container)
@@ -73,6 +75,10 @@ func provideCostCalculator(container *dig.Container) {
 	})
 }
 
+func provideEcho(container *dig.Container) {
+	mustProvide(container, echo.NewProvider)
+}
+
 func provideOpenAI(container *dig.Container) {
 	mustProvide(container, func(cfg *config.Config) (*openai.Provider, error) {
 		if cfg.OpenAI.APIKey == "" {
@@ -91,9 +97,15 @@ func provideOpenAI(container *dig.Container) {
 func registerProviders(container *dig.Container) {
 	err := container.Invoke(func(
 		reg domain.ProviderRegistry,
+		echoProvider *echo.Provider,
 		openaiProvider *openai.Provider,
 	) error {
 		ctx := context.Background()
+
+		// Echo provider is always registered (no config needed)
+		if err := reg.Register(ctx, echoProvider); err != nil {
+			return fmt.Errorf("failed to register echo provider: %w", err)
+		}
 
 		if openaiProvider != nil {
 			if err := reg.Register(ctx, openaiProvider); err != nil {
@@ -111,6 +123,13 @@ func registerProviders(container *dig.Container) {
 func registerPricing(container *dig.Container) {
 	mustInvoke(container, func(pricingReg domain.PricingRegistry) error {
 		ctx := context.Background()
+
+		// Register echo pricing (zero cost)
+		if err := echo.RegisterPricing(ctx, pricingReg); err != nil {
+			return fmt.Errorf("failed to register echo pricing: %w", err)
+		}
+
+		// Register OpenAI pricing
 		return openai.RegisterPricing(ctx, pricingReg)
 	})
 }
