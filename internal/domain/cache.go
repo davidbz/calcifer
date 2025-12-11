@@ -13,9 +13,6 @@ type SemanticCache interface {
 	// Set stores a response with its embedding in the cache.
 	Set(ctx context.Context, req *CompletionRequest, resp *CompletionResponse, ttl time.Duration) error
 
-	// Delete removes a cached entry by key.
-	Delete(ctx context.Context, cacheKey string) error
-
 	// Stats returns cache performance metrics.
 	Stats(ctx context.Context) (*CacheStats, error)
 }
@@ -39,9 +36,6 @@ type SimilaritySearch interface {
 
 	// Index stores a vector with associated data.
 	Index(ctx context.Context, key string, embedding []float64, data []byte, ttl time.Duration) error
-
-	// Remove deletes an indexed vector.
-	Remove(ctx context.Context, key string) error
 }
 
 // CachedResponse represents a cached completion response with metadata.

@@ -28,6 +28,7 @@ func NewGenerator(config Config) (*Generator, error) {
 	}
 
 	if config.Model == "" {
+		//nolint:unconvert // conversion is explicit for clarity
 		config.Model = string(openai.EmbeddingModelTextEmbeddingAda002)
 	}
 
@@ -48,6 +49,7 @@ func (g *Generator) Generate(ctx context.Context, text string) ([]float64, error
 		Input: openai.EmbeddingNewParamsInputUnion{
 			OfArrayOfStrings: []string{text},
 		},
+		//nolint:unconvert // string to EmbeddingModel conversion required
 		Model: openai.EmbeddingModel(g.model),
 	})
 	if err != nil {
@@ -68,6 +70,7 @@ func (g *Generator) Name() string {
 
 // Dimension returns the vector dimension.
 func (g *Generator) Dimension() int {
+	//nolint:unconvert // string comparisons with EmbeddingModel constants
 	switch g.model {
 	case string(openai.EmbeddingModelTextEmbeddingAda002),
 		string(openai.EmbeddingModelTextEmbedding3Small):

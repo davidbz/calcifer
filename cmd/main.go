@@ -133,6 +133,7 @@ func provideCache(container *dig.Container) {
 			opts.Password = redisCfg.Password
 		}
 		opts.DB = redisCfg.DB
+		opts.Protocol = 2 // Use RESP2 for stable FT.SEARCH responses
 
 		client := redisClient.NewClient(opts)
 

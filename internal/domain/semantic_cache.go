@@ -146,19 +146,6 @@ func (s *SemanticCacheService) Set(
 	return nil
 }
 
-// Delete removes a cached entry by key.
-func (s *SemanticCacheService) Delete(ctx context.Context, cacheKey string) error {
-	if cacheKey == "" {
-		return errors.New("cache key cannot be empty")
-	}
-
-	if err := s.similaritySearch.Remove(ctx, cacheKey); err != nil {
-		return fmt.Errorf("failed to remove from cache: %w", err)
-	}
-
-	return nil
-}
-
 // Stats returns cache performance metrics.
 func (s *SemanticCacheService) Stats(_ context.Context) (*CacheStats, error) {
 	return &CacheStats{}, nil

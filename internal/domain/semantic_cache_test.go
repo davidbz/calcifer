@@ -185,33 +185,6 @@ func TestSemanticCacheService_Set_NilResponse(t *testing.T) {
 	require.Equal(t, "response cannot be nil", err.Error())
 }
 
-func TestSemanticCacheService_Delete_Success(t *testing.T) {
-	ctx := context.Background()
-	mockEmbedding := mocks.NewMockEmbeddingGenerator(t)
-	mockSearch := mocks.NewMockSimilaritySearch(t)
-
-	mockSearch.EXPECT().
-		Remove(mock.Anything, "cache:abc123").
-		Return(nil)
-
-	service := domain.NewSemanticCacheService(mockEmbedding, mockSearch, 0.85)
-
-	err := service.Delete(ctx, "cache:abc123")
-	require.NoError(t, err)
-}
-
-func TestSemanticCacheService_Delete_EmptyKey(t *testing.T) {
-	ctx := context.Background()
-	mockEmbedding := mocks.NewMockEmbeddingGenerator(t)
-	mockSearch := mocks.NewMockSimilaritySearch(t)
-
-	service := domain.NewSemanticCacheService(mockEmbedding, mockSearch, 0.85)
-
-	err := service.Delete(ctx, "")
-	require.Error(t, err)
-	require.Equal(t, "cache key cannot be empty", err.Error())
-}
-
 func TestSemanticCacheService_Stats(t *testing.T) {
 	ctx := context.Background()
 	mockEmbedding := mocks.NewMockEmbeddingGenerator(t)

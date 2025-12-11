@@ -295,6 +295,13 @@ linters:
         - ^golang.org/x/tools/go/analysis.Analyzer$
         - ^google.golang.org/protobuf/.+Options$
         - ^gopkg.in/yaml.v3.Node$
+        # redis
+        - ^github.com/redis/go-redis/v9.FTSearchOptions$
+        - ^github.com/redis/go-redis/v9.FTSearchReturn$
+        - ^github.com/redis/go-redis/v9.FTCreateOptions$
+        - ^github.com/redis/go-redis/v9.FieldSchema$
+        - ^github.com/redis/go-redis/v9.FTVectorArgs$
+        - ^github.com/redis/go-redis/v9.FTFlatOptions$
       # Allows empty structures in return statements.
       # Default: false
       allow-empty-returns: true
