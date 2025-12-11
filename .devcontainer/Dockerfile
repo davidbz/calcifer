@@ -3,18 +3,27 @@ FROM mcr.microsoft.com/devcontainers/go:latest
 ENV LANG en_US.utf8
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install golangci-lint
-ARG GOLANGCI_LINT_VERSION=latest
-RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${GOLANGCI_LINT_VERSION}
+# Set GOPATH for vscode user
+ENV GOPATH=/home/vscode/go
+ENV GOBIN=/home/vscode/go/bin
+ENV PATH=$PATH:$GOBIN
 
-# Install Go development tools
-RUN go install golang.org/x/tools/gopls@latest && \
-    go install github.com/go-delve/delve/cmd/dlv@latest && \
-    go install honnef.co/go/tools/cmd/staticcheck@latest && \
-    go install golang.org/x/tools/cmd/goimports@latest && \
-    go install github.com/fatih/gomodifytags@latest && \
-    go install github.com/josharian/impl@latest && \
-    go install github.com/cweill/gotests/gotests@latest
+# Create GOPATH directories with correct permissions
+RUN mkdir -p /home/vscode/go/bin && \
+    chown -R vscode:vscode /home/vscode/go
+
+# Install golangci-lint as vscode user
+ARG GOLANGCI_LINT_VERSION=latest
+RUN su vscode -c "curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /home/vscode/go/bin ${GOLANGCI_LINT_VERSION}"
+
+# Install Go development tools as vscode user
+RUN su vscode -c "go install golang.org/x/tools/gopls@latest" && \
+    su vscode -c "go install github.com/go-delve/delve/cmd/dlv@latest" && \
+    su vscode -c "go install honnef.co/go/tools/cmd/staticcheck@latest" && \
+    su vscode -c "go install golang.org/x/tools/cmd/goimports@latest" && \
+    su vscode -c "go install github.com/fatih/gomodifytags@latest" && \
+    su vscode -c "go install github.com/josharian/impl@latest" && \
+    su vscode -c "go install github.com/cweill/gotests/gotests@latest"
 
 # Utilities
 RUN apt-get update && apt-get install -y \
