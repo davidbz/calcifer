@@ -1,0 +1,79 @@
+.PHONY: build test run clean help mocks mocks-clean mocks-regen
+
+# Build the app binary
+build:
+	@echo "Building..."
+	@go build -o bin/app ./cmd/
+	@echo "Build complete: bin/app"
+
+# Generate mocks
+mocks:
+	@echo "Generating mocks..."
+	@mockery --config .mockery.yaml
+	@echo "Mocks generated successfully"
+
+# Clean generated mocks
+mocks-clean:
+	@echo "Cleaning mocks..."
+	@rm -rf internal/mocks
+	@echo "Mocks cleaned"
+
+# Regenerate mocks (clean + generate)
+mocks-regen: mocks-clean mocks
+	@echo "Mocks regenerated"
+
+# Run all tests (generates mocks first)
+test: mocks
+	@echo "Running tests..."
+	@go test -v ./...
+
+# Run tests with coverage
+test-coverage:
+	@echo "Running tests with coverage..."
+	@go test -cover -coverprofile=coverage.out ./...
+	@go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+# Run the app
+run:
+	@echo "Starting..."
+	@go run ./cmd/
+
+# Clean build artifacts
+clean:
+	@echo "Cleaning..."
+	@rm -rf bin/
+	@rm -f coverage.out coverage.html
+	@echo "Clean complete"
+
+# Install dependencies
+deps:
+	@echo "Installing dependencies..."
+	@go mod download
+	@go mod tidy
+
+# Format code
+fmt:
+	@echo "Formatting code..."
+	@go fmt ./...
+
+# Lint code (requires golangci-lint)
+lint:
+	@echo "Linting code..."
+	@golangci-lint run
+
+# Help
+help:
+	@echo "Available targets:"
+	@echo "  build         - Build the app binary"
+	@echo "  test          - Run all tests (generates mocks first)"
+	@echo "  test-coverage - Run tests with coverage report"
+	@echo "  run           - Run the app"
+	@echo "  clean         - Clean build artifacts"
+	@echo "  deps          - Install dependencies"
+	@echo "  fmt           - Format code"
+	@echo "  lint          - Lint code (requires golangci-lint)"
+	@echo "  mocks         - Generate mocks from interfaces"
+	@echo "  mocks-clean   - Remove generated mocks"
+	@echo "  mocks-regen   - Clean and regenerate all mocks"
+	@echo "  help          - Show this help message"

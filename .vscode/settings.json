@@ -14,7 +14,7 @@
     "go.lintTool": "golangci-lint",
     "go.lintOnSave": "workspace",
     "go.lintFlags": [
-        "--fast"
+        "--fast-only"
     ],
     "go.vetOnSave": "off",
     "go.formatTool": "goimports",

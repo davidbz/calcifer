@@ -25,6 +25,10 @@
 			]
 		}
 	},
+	"containerEnv": {
+		"GOPATH": "/home/vscode/go",
+		"GOBIN": "/home/vscode/go/bin"
+	},
 	"postCreateCommand": "go mod tidy",
 	"remoteUser": "vscode"
 }
