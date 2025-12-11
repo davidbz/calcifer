@@ -23,7 +23,8 @@ RUN su vscode -c "go install golang.org/x/tools/gopls@latest" && \
     su vscode -c "go install golang.org/x/tools/cmd/goimports@latest" && \
     su vscode -c "go install github.com/fatih/gomodifytags@latest" && \
     su vscode -c "go install github.com/josharian/impl@latest" && \
-    su vscode -c "go install github.com/cweill/gotests/gotests@latest"
+    su vscode -c "go install github.com/cweill/gotests/gotests@latest" && \
+    su vscode -c "go install github.com/vektra/mockery/v2@latest"
 
 # Utilities
 RUN apt-get update && apt-get install -y \
