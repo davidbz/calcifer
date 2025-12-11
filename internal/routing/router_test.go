@@ -50,11 +50,13 @@ type mockProvider struct {
 }
 
 func (m *mockProvider) Complete(_ context.Context, _ *domain.CompletionRequest) (*domain.CompletionResponse, error) {
-	return nil, nil
+	return &domain.CompletionResponse{}, nil
 }
 
 func (m *mockProvider) Stream(_ context.Context, _ *domain.CompletionRequest) (<-chan domain.StreamChunk, error) {
-	return nil, nil
+	ch := make(chan domain.StreamChunk)
+	close(ch)
+	return ch, nil
 }
 
 func (m *mockProvider) Name() string {

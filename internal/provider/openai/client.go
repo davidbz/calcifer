@@ -43,7 +43,8 @@ type openAIMessage struct {
 	Content string `json:"content"`
 }
 
-type openAIResponse struct {
+// Response represents the response from OpenAI API.
+type Response struct {
 	ID      string `json:"id"`
 	Model   string `json:"model"`
 	Choices []struct {
@@ -70,7 +71,7 @@ type openAIStreamChunk struct {
 }
 
 // Complete sends a non-streaming completion request.
-func (c *Client) Complete(ctx context.Context, req openAIRequest) (*openAIResponse, error) {
+func (c *Client) Complete(ctx context.Context, req openAIRequest) (*Response, error) {
 	if c.apiKey == "" {
 		return nil, errors.New("API key is not configured")
 	}
@@ -104,7 +105,7 @@ func (c *Client) Complete(ctx context.Context, req openAIRequest) (*openAIRespon
 		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var openAIResp openAIResponse
+	var openAIResp Response
 	if decodeErr := json.NewDecoder(resp.Body).Decode(&openAIResp); decodeErr != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", decodeErr)
 	}
@@ -113,13 +114,27 @@ func (c *Client) Complete(ctx context.Context, req openAIRequest) (*openAIRespon
 }
 
 // Stream sends a streaming completion request.
-func (c *Client) Stream(ctx context.Context, req openAIRequest) (<-chan streamResult, error) {
+func (c *Client) Stream(ctx context.Context, req openAIRequest) (<-chan StreamResult, error) {
 	if c.apiKey == "" {
 		return nil, errors.New("API key is not configured")
 	}
 
 	req.Stream = true
 
+	//nolint:bodyclose // Response body is closed in processStreamResponse goroutine
+	resp, err := c.executeStreamRequest(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	chunks := make(chan StreamResult)
+	go c.processStreamResponse(resp, chunks)
+
+	return chunks, nil
+}
+
+// executeStreamRequest creates and executes the HTTP request for streaming.
+func (c *Client) executeStreamRequest(ctx context.Context, req openAIRequest) (*http.Response, error) {
 	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
@@ -139,7 +154,6 @@ func (c *Client) Stream(ctx context.Context, req openAIRequest) (<-chan streamRe
 	httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
 	httpReq.Header.Set("Accept", "text/event-stream")
 
-	//nolint:bodyclose // Body is closed in the goroutine below.
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
@@ -151,43 +165,55 @@ func (c *Client) Stream(ctx context.Context, req openAIRequest) (<-chan streamRe
 		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	chunks := make(chan streamResult)
-
-	go func() {
-		defer close(chunks)
-		defer resp.Body.Close()
-
-		decoder := json.NewDecoder(resp.Body)
-		for {
-			var chunk openAIStreamChunk
-			if decodeErr := decoder.Decode(&chunk); decodeErr != nil {
-				if decodeErr != io.EOF {
-					chunks <- streamResult{Delta: "", Done: false, Error: decodeErr}
-				}
-				return
-			}
-
-			if len(chunk.Choices) > 0 {
-				delta := chunk.Choices[0].Delta.Content
-				done := chunk.Choices[0].FinishReason != nil
-
-				chunks <- streamResult{
-					Delta: delta,
-					Done:  done,
-					Error: nil,
-				}
-
-				if done {
-					return
-				}
-			}
-		}
-	}()
-
-	return chunks, nil
+	return resp, nil
 }
 
-type streamResult struct {
+// processStreamResponse reads and processes the streaming response.
+func (c *Client) processStreamResponse(resp *http.Response, chunks chan<- StreamResult) {
+	defer close(chunks)
+	defer resp.Body.Close()
+
+	decoder := json.NewDecoder(resp.Body)
+	for {
+		chunk, done, err := c.decodeStreamChunk(decoder)
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				chunks <- StreamResult{Delta: "", Done: false, Error: err}
+			}
+			return
+		}
+
+		chunks <- chunk
+
+		if done {
+			return
+		}
+	}
+}
+
+// decodeStreamChunk decodes a single chunk from the stream.
+func (c *Client) decodeStreamChunk(decoder *json.Decoder) (StreamResult, bool, error) {
+	var chunk openAIStreamChunk
+	if err := decoder.Decode(&chunk); err != nil {
+		return StreamResult{}, false, fmt.Errorf("failed to decode stream chunk: %w", err)
+	}
+
+	if len(chunk.Choices) == 0 {
+		return StreamResult{}, false, nil
+	}
+
+	delta := chunk.Choices[0].Delta.Content
+	done := chunk.Choices[0].FinishReason != nil
+
+	return StreamResult{
+		Delta: delta,
+		Done:  done,
+		Error: nil,
+	}, done, nil
+}
+
+// StreamResult represents a single result from the streaming API.
+type StreamResult struct {
 	Delta string
 	Done  bool
 	Error error

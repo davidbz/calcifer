@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 
@@ -15,6 +16,9 @@ import (
 	"github.com/davidbz/calcifer/internal/provider/registry"
 	"github.com/davidbz/calcifer/internal/routing"
 )
+
+// ErrProviderNotConfigured indicates that a provider is not configured and should be skipped.
+var ErrProviderNotConfigured = errors.New("provider not configured")
 
 func main() {
 	container := buildContainer()
@@ -55,7 +59,7 @@ func buildContainer() *dig.Container {
 	// OpenAI Provider
 	if err := container.Provide(func(cfg *config.Config) (*openai.Provider, error) {
 		if cfg.OpenAI.APIKey == "" {
-			return nil, nil
+			return nil, ErrProviderNotConfigured
 		}
 
 		return openai.NewProvider(openai.Config{
@@ -84,7 +88,10 @@ func buildContainer() *dig.Container {
 
 		return nil
 	}); err != nil {
-		log.Fatalf("Failed to register providers: %v", err)
+		// Ignore ErrProviderNotConfigured as it's expected for optional providers
+		if !errors.Is(err, ErrProviderNotConfigured) {
+			log.Fatalf("Failed to register providers: %v", err)
+		}
 	}
 
 	// Router

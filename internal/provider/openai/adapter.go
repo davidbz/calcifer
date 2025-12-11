@@ -185,7 +185,7 @@ func (p *Provider) toOpenAIRequest(req *domain.CompletionRequest) openAIRequest 
 }
 
 // toDomainResponse converts OpenAI response to domain response
-func (p *Provider) toDomainResponse(resp *openAIResponse) *domain.CompletionResponse {
+func (p *Provider) toDomainResponse(resp *Response) *domain.CompletionResponse {
 	content := ""
 	if len(resp.Choices) > 0 {
 		content = resp.Choices[0].Message.Content
