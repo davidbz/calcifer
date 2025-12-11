@@ -7,7 +7,7 @@ import (
 )
 
 // TraceMiddleware injects trace ID and request ID into every request.
-func TraceMiddleware(logger *zap.Logger) func(http.Handler) http.Handler {
+func TraceMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -20,9 +20,6 @@ func TraceMiddleware(logger *zap.Logger) func(http.Handler) http.Handler {
 
 			requestID := GenerateRequestID()
 			ctx = WithRequestID(ctx, requestID)
-
-			// Add logger to context
-			ctx = WithLogger(ctx, logger)
 
 			w.Header().Set("X-Trace-Id", traceID)
 			w.Header().Set("X-Request-Id", requestID)

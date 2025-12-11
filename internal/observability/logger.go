@@ -3,13 +3,18 @@ package observability
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"go.uber.org/zap"
 )
 
 const (
-	loggerKey              contextKey = "logger"
-	maxLoggerFieldCapacity int        = 5 // Maximum number of context fields to add to logger
+	maxLoggerFieldCapacity int = 5 // Maximum number of context fields to add to logger
+)
+
+var (
+	globalLogger *zap.Logger
+	loggerMu     sync.RWMutex
 )
 
 // InitLogger initializes the base logger (called once at startup).
@@ -18,20 +23,31 @@ func InitLogger() (*zap.Logger, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize logger: %w", err)
 	}
+
+	loggerMu.Lock()
+	globalLogger = logger
+	loggerMu.Unlock()
+
 	return logger, nil
 }
 
-// WithLogger adds a logger to the context.
-func WithLogger(ctx context.Context, logger *zap.Logger) context.Context {
-	return context.WithValue(ctx, loggerKey, logger)
+// getBaseLogger returns the global logger instance.
+func getBaseLogger() *zap.Logger {
+	loggerMu.RLock()
+	logger := globalLogger
+	loggerMu.RUnlock()
+
+	if logger == nil {
+		// Fallback to production logger if not initialized
+		logger, _ = zap.NewProduction()
+	}
+
+	return logger
 }
 
 // FromContext creates a logger with fields extracted from context.
 func FromContext(ctx context.Context) *zap.Logger {
-	logger, ok := ctx.Value(loggerKey).(*zap.Logger)
-	if !ok || logger == nil {
-		logger, _ = zap.NewProduction()
-	}
+	logger := getBaseLogger()
 
 	fields := make([]zap.Field, 0, maxLoggerFieldCapacity)
 

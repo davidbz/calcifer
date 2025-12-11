@@ -36,8 +36,8 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/v1/completions", s.handler.HandleCompletion)
 	mux.HandleFunc("/health", s.handler.HandleHealth)
 
-	// Wrap with TraceMiddleware to inject trace IDs and logger into context.
-	handlerWithTrace := observability.TraceMiddleware(s.logger)(mux)
+	// Wrap with TraceMiddleware to inject trace IDs into context.
+	handlerWithTrace := observability.TraceMiddleware()(mux)
 
 	// Create server with timeouts.
 	srv := &http.Server{
