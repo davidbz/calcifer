@@ -47,7 +47,7 @@ type DepConfig struct {
 
 // Load loads environment files and parses configuration.
 func Load() *Config {
-	for _, file := range []string{".env", ".env.defaults", ".env.secrets"} {
+	for _, file := range []string{".env"} {
 		_ = godotenv.Load(file)
 	}
 
