@@ -119,3 +119,31 @@ func GenerateSpanID() string {
 func GenerateRequestID() string {
 	return uuid.New().String()
 }
+
+// DetachContext creates a new background context with observability values from the original context.
+// This is useful for async operations that outlive the original request context.
+func DetachContext(ctx context.Context) context.Context {
+	newCtx := context.Background()
+
+	if traceID := GetTraceID(ctx); traceID != "" {
+		newCtx = WithTraceID(newCtx, traceID)
+	}
+
+	if spanID := GetSpanID(ctx); spanID != "" {
+		newCtx = WithSpanID(newCtx, spanID)
+	}
+
+	if requestID := GetRequestID(ctx); requestID != "" {
+		newCtx = WithRequestID(newCtx, requestID)
+	}
+
+	if provider := GetProvider(ctx); provider != "" {
+		newCtx = WithProvider(newCtx, provider)
+	}
+
+	if model := GetModel(ctx); model != "" {
+		newCtx = WithModel(newCtx, model)
+	}
+
+	return newCtx
+}

@@ -652,7 +652,7 @@ func TestGatewayService_CompleteByModel_WithCache(t *testing.T) {
 		mockCache.AssertExpectations(t)
 	})
 
-	t.Run("should bypass cache for streaming requests", func(t *testing.T) {
+	t.Run("should store non-streaming requests in cache", func(t *testing.T) {
 		mockRegistry := mocks.NewMockProviderRegistry(t)
 		mockCostCalc := mocks.NewMockCostCalculator(t)
 		mockCache := mocks.NewMockSemanticCache(t)
@@ -664,7 +664,7 @@ func TestGatewayService_CompleteByModel_WithCache(t *testing.T) {
 			Messages: []domain.Message{
 				{Role: "user", Content: "Hello"},
 			},
-			Stream: true,
+			Stream: false,
 		}
 
 		providerResp := &domain.CompletionResponse{
@@ -679,6 +679,10 @@ func TestGatewayService_CompleteByModel_WithCache(t *testing.T) {
 			},
 		}
 
+		mockCache.EXPECT().
+			Get(mock.Anything, req).
+			Return(nil, domain.ErrCacheMiss)
+
 		mockRegistry.EXPECT().
 			GetByModel(mock.Anything, "gpt-4").
 			Return(mockProvider, nil)
@@ -691,15 +695,22 @@ func TestGatewayService_CompleteByModel_WithCache(t *testing.T) {
 			Calculate(mock.Anything, "gpt-4", mock.AnythingOfType("domain.Usage")).
 			Return(0.001, nil)
 
+		mockCache.EXPECT().
+			Set(mock.Anything, req, providerResp, mock.AnythingOfType("time.Duration")).
+			Return(nil)
+
 		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, mockCache)
 
 		response, err := gateway.CompleteByModel(ctx, req)
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
+		require.Equal(t, "provider-123", response.ID)
+
 		mockRegistry.AssertExpectations(t)
 		mockProvider.AssertExpectations(t)
 		mockCostCalc.AssertExpectations(t)
+		mockCache.AssertExpectations(t)
 	})
 
 	t.Run("should continue on cache error", func(t *testing.T) {
