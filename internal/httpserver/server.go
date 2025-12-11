@@ -1,4 +1,4 @@
-package http
+package httpserver
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/davidbz/calcifer/internal/config"
-	"github.com/davidbz/calcifer/internal/http/middleware"
+	"github.com/davidbz/calcifer/internal/httpserver/middleware"
 	"github.com/davidbz/calcifer/internal/observability"
 )
 

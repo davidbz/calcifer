@@ -13,8 +13,8 @@ import (
 
 	"github.com/davidbz/calcifer/internal/config"
 	"github.com/davidbz/calcifer/internal/domain"
-	"github.com/davidbz/calcifer/internal/http"
-	"github.com/davidbz/calcifer/internal/http/middleware"
+	"github.com/davidbz/calcifer/internal/httpserver"
+	"github.com/davidbz/calcifer/internal/httpserver/middleware"
 	"github.com/davidbz/calcifer/internal/observability"
 	"github.com/davidbz/calcifer/internal/provider/echo"
 	"github.com/davidbz/calcifer/internal/provider/openai"
@@ -37,7 +37,7 @@ func main() {
 	// Start server in goroutine
 	serverErr := make(chan error, 1)
 	go func() {
-		err := container.Invoke(func(server *http.Server) error {
+		err := container.Invoke(func(server *httpserver.Server) error {
 			return server.Start()
 		})
 		serverErr <- err
@@ -59,7 +59,7 @@ func main() {
 	// Graceful shutdown with timeout
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 
-	err := container.Invoke(func(server *http.Server) error {
+	err := container.Invoke(func(server *httpserver.Server) error {
 		return server.Shutdown(shutdownCtx)
 	})
 	cancel()
@@ -178,9 +178,9 @@ func provideDomainServices(container *dig.Container) {
 }
 
 func provideHTTPLayer(container *dig.Container) {
-	mustProvide(container, http.NewHandler)
+	mustProvide(container, httpserver.NewHandler)
 	mustProvide(container, middleware.BuildMiddlewareChain)
-	mustProvide(container, http.NewServer)
+	mustProvide(container, httpserver.NewServer)
 }
 
 func mustProvide(container *dig.Container, constructor any) {
