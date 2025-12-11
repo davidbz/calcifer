@@ -4,13 +4,15 @@ import (
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
 	"go.uber.org/dig"
+
+	"github.com/davidbz/calcifer/internal/provider/openai"
 )
 
 // Config represents the gateway configuration.
 type Config struct {
 	Server ServerConfig
 	CORS   CORSConfig
-	OpenAI OpenAIConfig
+	OpenAI openai.Config
 }
 
 // ServerConfig contains HTTP server settings.
@@ -29,20 +31,12 @@ type CORSConfig struct {
 	MaxAge           int      `env:"CORS_MAX_AGE"                            envDefault:"86400"`
 }
 
-// OpenAIConfig contains OpenAI provider settings.
-type OpenAIConfig struct {
-	APIKey     string `env:"OPENAI_API_KEY"`
-	BaseURL    string `env:"OPENAI_BASE_URL"    envDefault:"https://api.openai.com/v1"`
-	Timeout    int    `env:"OPENAI_TIMEOUT"     envDefault:"60"`
-	MaxRetries int    `env:"OPENAI_MAX_RETRIES" envDefault:"3"`
-}
-
 // DepConfig is used for dependency injection with dig.
 type DepConfig struct {
 	dig.Out
 	*ServerConfig
 	*CORSConfig
-	*OpenAIConfig
+	*openai.Config
 }
 
 // Load loads environment files and parses configuration.

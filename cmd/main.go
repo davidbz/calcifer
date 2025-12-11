@@ -80,17 +80,12 @@ func provideEcho(container *dig.Container) {
 }
 
 func provideOpenAI(container *dig.Container) {
-	mustProvide(container, func(cfg *config.Config) (*openai.Provider, error) {
-		if cfg.OpenAI.APIKey == "" {
+	mustProvide(container, func(cfg *openai.Config) (*openai.Provider, error) {
+		if cfg.APIKey == "" {
 			return nil, ErrProviderNotConfigured
 		}
 
-		return openai.NewProvider(openai.Config{
-			APIKey:     cfg.OpenAI.APIKey,
-			BaseURL:    cfg.OpenAI.BaseURL,
-			Timeout:    cfg.OpenAI.Timeout,
-			MaxRetries: cfg.OpenAI.MaxRetries,
-		})
+		return openai.NewProvider(*cfg)
 	})
 }
 
