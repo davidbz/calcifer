@@ -1,545 +1,240 @@
-# AI Gateway
+# Calcifer - AI Gateway
 
-A microservices-based AI gateway that acts as a reverse proxy for multiple LLM providers.
+> A smart reverse proxy for LLM providers with automatic routing and cost tracking.
 
-## Architecture
+## Overview
 
-The AI Gateway follows clean architecture principles with clear separation of concerns:
+Calcifer routes requests to multiple LLM providers based on model name and tracks token costs automatically.
 
-- **Domain Layer**: Provider-agnostic business logic and gateway orchestration
-- **Provider Layer**: Provider-specific adapters and intelligent routing registry
-- **HTTP Layer**: REST API endpoints
-- **Observability**: Structured logging and event publishing
-- **Configuration**: Environment-based configuration management
+**Key Features:**
+- 🎯 Automatic provider routing
+- 💰 Real-time cost calculation (USD per request)
+- 🔌 Zero vendor lock-in (provider-agnostic domain)
+- 🚀 SSE streaming support
+- 🧪 98.6% test coverage in domain layer
 
-## Features
+**Architecture:** Clean separation - Domain (business logic) → Provider (adapters) → HTTP (handlers)
 
-✅ Unified API for multiple LLM providers
-✅ Automatic provider routing based on model
-✅ Streaming support via Server-Sent Events (SSE)
-✅ **Token usage tracking and cost calculation**
-✅ CORS support with configurable policies
-✅ Composable HTTP middleware infrastructure
-✅ Provider abstraction (no vendor lock-in)
-✅ Dependency injection with uber-go/dig
-✅ Structured logging with slog
-✅ Comprehensive unit tests
-✅ Type-safe throughout
-✅ Follows Go best practices from [coding-conv.md](coding-conv.md)
-
-## Project Structure
-
-```
-.
-├── cmd/
-│   └── main.go                     # Application entry point
-├── internal/
-│   ├── domain/                     # Core business logic
-│   │   ├── models.go              # Domain models
-│   │   ├── interfaces.go          # Core interfaces
-│   │   ├── gateway.go             # Gateway service with auto-routing
-│   │   ├── pricing.go             # Pricing interfaces
-│   │   ├── cost_calculator.go     # Token-based cost calculation
-│   │   ├── pricing_registry.go    # In-memory pricing storage
-│   │   ├── gateway_test.go        # Unit tests
-│   │   └── cost_calculator_test.go # Cost calculation tests
-│   ├── provider/                   # Provider implementations
-│   │   ├── registry/
-│   │   │   ├── registry.go        # Provider registry with model routing
-│   │   │   └── registry_test.go   # Unit tests
-│   │   └── openai/
-│   │       ├── config.go          # OpenAI configuration
-│   │       ├── adapter.go         # OpenAI adapter (type translation only)
-│   │       └── pricing.go         # OpenAI model pricing data
-│   ├── http/                       # HTTP layer
-│   │   ├── handler.go             # Request handlers
-│   │   ├── server.go              # HTTP server
-│   │   └── middleware/            # HTTP middlewares
-│   │       ├── middleware.go      # Core middleware types
-│   │       └── cors.go            # CORS middleware
-│   ├── observability/              # Logging and events
-│   │   ├── logger.go
-│   │   ├── trace.go               # Trace middleware
-│   │   └── context.go
-│   └── config/                     # Configuration
-│       └── config.go
-└── go.mod
-```
+---
 
 ## Quick Start
 
-### Prerequisites
-
-- Go 1.24.5 or higher
-- OpenAI API key (optional, only if using OpenAI provider)
-
-### Installation
-
-1. Clone the repository:
 ```bash
 git clone <repository-url>
 cd calcifer
-```
-
-2. Install dependencies:
-```bash
 go mod download
-```
 
-3. Build the application:
-```bash
-go build -o bin/gateway ./cmd/gateway
-```
-
-### Configuration
-
-Configure the gateway using environment variables:
-
-#### Server Configuration
-- `SERVER_PORT` - HTTP server port (default: 8080)
-- `SERVER_READ_TIMEOUT` - Read timeout in seconds (default: 30)
-- `SERVER_WRITE_TIMEOUT` - Write timeout in seconds (default: 30)
-
-#### CORS Configuration
-- `CORS_ALLOWED_ORIGINS` - Comma-separated list of allowed origins (default: *)
-- `CORS_ALLOWED_METHODS` - Comma-separated list of allowed HTTP methods (default: GET,POST,PUT,DELETE,OPTIONS)
-- `CORS_ALLOWED_HEADERS` - Comma-separated list of allowed headers (default: Content-Type,Authorization)
-- `CORS_ALLOW_CREDENTIALS` - Allow credentials (cookies, authorization headers) (default: true)
-- `CORS_MAX_AGE` - Preflight cache duration in seconds (default: 86400)
-
-#### OpenAI Configuration
-- `OPENAI_API_KEY` - OpenAI API key (required for OpenAI provider)
-- `OPENAI_BASE_URL` - OpenAI API base URL (default: https://api.openai.com/v1)
-- `OPENAI_TIMEOUT` - Request timeout in seconds (default: 60)
-- `OPENAI_MAX_RETRIES` - Maximum retry attempts (default: 3)
-
-### Running the Gateway
-
-```bash
-# Set your OpenAI API key
+# Set API key and start
 export OPENAI_API_KEY="sk-..."
+go run ./cmd/main.go
 
-# Run the gateway
-./bin/gateway
+# Gateway running on http://localhost:8080
 ```
 
-Or run directly:
-```bash
-OPENAI_API_KEY="sk-..." go run ./cmd/gateway
-```
-
-The gateway will start on `http://localhost:8080` by default.
-
-## API Usage
-
-### Non-Streaming Completion
-
-The gateway automatically routes requests to the appropriate provider based on the model name:
+### Usage Example
 
 ```bash
+# Request routes automatically based on model
 curl -X POST http://localhost:8080/v1/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4",
-    "messages": [
-      {"role": "user", "content": "Hello, how are you?"}
-    ],
-    "temperature": 0.7,
-    "max_tokens": 100
+    "messages": [{"role": "user", "content": "Hello"}]
   }'
 ```
 
-Response:
+**Response includes cost:**
 ```json
 {
-  "id": "chatcmpl-...",
-  "model": "gpt-4",
-  "provider": "openai",
-  "content": "Hello! I'm doing well, thank you for asking...",
+  "content": "Hello! How can I help?",
   "usage": {
     "prompt_tokens": 12,
     "completion_tokens": 25,
-    "total_tokens": 37,
     "cost": 0.00126
-  },
-  "finish_time": "2024-01-15T10:30:00Z"
+  }
 }
 ```
 
-### Streaming Completion
+### Testing Without API Keys
+
+Use the built-in `echo4` model for testing (no API key required):
 
 ```bash
+# Echo provider returns your input with token counts
 curl -X POST http://localhost:8080/v1/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4",
-    "messages": [
-      {"role": "user", "content": "Write a short poem"}
-    ],
-    "stream": true
+    "model": "echo4",
+    "messages": [{"role": "user", "content": "Test message"}]
   }'
+
+# Response:
+# {
+#   "content": "Test message",
+#   "usage": {
+#     "prompt_tokens": 2,
+#     "completion_tokens": 2,
+#     "cost": 0.0002
+#   }
+# }
 ```
 
-Response (Server-Sent Events):
-```
-data: {"delta":"The","done":false}
+The `echo4` provider:
+- Echoes back your input messages
+- Calculates token counts (simple word-based)
+- Works offline (no external API calls)
+- Perfect for development and testing
 
-data: {"delta":" sky","done":false}
+---
 
-data: {"delta":" is","done":false}
+## Configuration
 
-data: {"delta":"","done":true}
-```
+Environment variables:
 
-### Health Check
+**Server:**
+- `SERVER_PORT` - Port (default: 8080)
+- `SERVER_READ_TIMEOUT` - Read timeout (default: 30s)
+- `SERVER_WRITE_TIMEOUT` - Write timeout (default: 30s)
 
-```bash
-curl http://localhost:8080/health
-```
+**CORS:**
+- `CORS_ALLOWED_ORIGINS` - Allowed origins (default: `*`)
+- `CORS_ALLOWED_METHODS` - HTTP methods (default: GET,POST,PUT,DELETE,OPTIONS)
+- `CORS_ALLOWED_HEADERS` - Headers (default: Content-Type,Authorization)
 
-Response:
-```json
-{
-  "status": "healthy"
-}
-```
+**OpenAI:**
+- `OPENAI_API_KEY` - API key (required)
+- `OPENAI_BASE_URL` - Base URL (default: https://api.openai.com/v1)
+- `OPENAI_TIMEOUT` - Timeout (default: 60s)
+- `OPENAI_MAX_RETRIES` - Max retries (default: 3)
 
-## Testing
+---
 
-Run all tests:
-```bash
-go test ./...
-```
+## Adding a New Provider
 
-Run tests with coverage:
-```bash
-go test -cover ./...
-```
+Add a new LLM provider in 3 steps:
 
-Run tests for a specific package:
-```bash
-go test ./internal/domain
-go test ./internal/provider/registry
-go test ./internal/config
-```
-
-## Mock Generation
-
-This project uses [mockery](https://github.com/vektra/mockery) to automatically generate test mocks from interfaces.
-
-### Generating Mocks
-
-To generate or regenerate mocks after interface changes:
-
-```bash
-make mocks
-```
-
-Or directly:
-
-```bash
-mockery --config .mockery.yaml
-```
-
-### Mock Location
-
-All generated mocks are in `internal/mocks/` with the following files:
-- `provider.go` - MockProvider
-- `provider_registry.go` - MockProviderRegistry
-- `cost_calculator.go` - MockCostCalculator
-- `pricing_registry.go` - MockPricingRegistry
-
-### Using Mocks in Tests
-
-```go
-import (
-    "github.com/davidbz/calcifer/internal/mocks"
-    "github.com/stretchr/testify/mock"
-)
-
-func TestExample(t *testing.T) {
-    // Create mock with test context
-    mockProvider := mocks.NewMockProvider(t)
-
-    // Set expectations
-    mockProvider.EXPECT().Name().Return("test-provider")
-    mockProvider.EXPECT().Complete(mock.Anything, mock.AnythingOfType("*domain.CompletionRequest")).
-        Return(&domain.CompletionResponse{...}, nil)
-
-    // Use mock in test
-    // ... test code ...
-
-    // Verify expectations met
-    mockProvider.AssertExpectations(t)
-}
-```
-
-### When to Regenerate Mocks
-
-Regenerate mocks whenever you:
-- Add new methods to interfaces
-- Change method signatures
-- Add new interfaces to mock
-- Update mockery configuration
-
-## Development
-
-### Adding a New Provider
-
-To add support for a new LLM provider (e.g., Anthropic):
-
-1. Create provider package:
-```bash
-mkdir -p internal/provider/anthropic
-```
-
-2. Implement the provider:
+**1. Implement Provider Interface:**
 ```go
 // internal/provider/anthropic/adapter.go
-package anthropic
-
-import (
-    "context"
-    "github.com/davidbz/calcifer/internal/domain"
-)
-
 type Provider struct {
     client *Client
     name   string
 }
 
-func NewProvider(config Config) (*Provider, error) {
-    // Implementation
-}
-
 func (p *Provider) Complete(ctx context.Context, req *domain.CompletionRequest) (*domain.CompletionResponse, error) {
-    // Implementation
+    // Convert domain → SDK types, call API, convert back
 }
 
 func (p *Provider) Stream(ctx context.Context, req *domain.CompletionRequest) (<-chan domain.StreamChunk, error) {
-    // Implementation
-}
-
-func (p *Provider) Name() string {
-    return p.name
+    // Stream implementation
 }
 
 func (p *Provider) IsModelSupported(ctx context.Context, model string) bool {
-    // Return true if this provider supports the given model
-    supportedModels := map[string]bool{
-        "claude-3-opus":   true,
-        "claude-3-sonnet": true,
-        "claude-3-haiku":  true,
-    }
     return supportedModels[model]
 }
 ```
 
-3. Add pricing data:
+**2. Register Pricing:**
 ```go
 // internal/provider/anthropic/pricing.go
-package anthropic
-
-import (
-    "context"
-    "github.com/davidbz/calcifer/internal/domain"
-)
-
-const (
-    claude3OpusInputCostPer1K   = 0.015
-    claude3OpusOutputCostPer1K  = 0.075
-    claude3SonnetInputCostPer1K = 0.003
-    claude3SonnetOutputCostPer1K = 0.015
-)
-
-// RegisterPricing registers Anthropic model pricing with the registry.
 func RegisterPricing(ctx context.Context, registry domain.PricingRegistry) error {
-    models := map[string]domain.PricingConfig{
-        "claude-3-opus": {
-            InputCostPer1K:  claude3OpusInputCostPer1K,
-            OutputCostPer1K: claude3OpusOutputCostPer1K,
-        },
-        "claude-3-sonnet": {
-            InputCostPer1K:  claude3SonnetInputCostPer1K,
-            OutputCostPer1K: claude3SonnetOutputCostPer1K,
-        },
-    }
-
-    for model, config := range models {
-        if err := registry.RegisterPricing(ctx, model, config); err != nil {
-            return err
-        }
-    }
-    return nil
+    return registry.RegisterPricing(ctx, "claude-3-opus", domain.PricingConfig{
+        InputCostPer1K:  0.015,  // $0.015 per 1K tokens
+        OutputCostPer1K: 0.075,  // $0.075 per 1K tokens
+    })
 }
 ```
 
-4. Add configuration:
-```go
-// internal/config/config.go
-type Config struct {
-    Server    ServerConfig
-    OpenAI    OpenAIConfig
-    Anthropic AnthropicConfig  // Add this
-}
-```
-
-5. Register in DI container and registry:
+**3. Wire in DI Container:**
 ```go
 // cmd/main.go
-
-// 1. Provide the provider
 container.Provide(func(cfg *config.Config) (*anthropic.Provider, error) {
-    if cfg.Anthropic.APIKey == "" {
-        return nil, ErrProviderNotConfigured
-    }
     return anthropic.NewProvider(cfg.Anthropic)
 })
 
-// 2. Register it with the registry (in the Invoke section)
-container.Invoke(func(reg domain.ProviderRegistry, anthropicProvider *anthropic.Provider) error {
-    if anthropicProvider != nil {
-        return reg.Register(ctx, anthropicProvider)
-    }
-    return nil
+container.Invoke(func(reg domain.ProviderRegistry, p *anthropic.Provider) error {
+    return reg.Register(ctx, p)
 })
 
-// 3. Register pricing
 container.Invoke(func(pricingReg domain.PricingRegistry) error {
-    ctx := context.Background()
     return anthropic.RegisterPricing(ctx, pricingReg)
 })
 ```
 
-The registry will automatically route requests to your provider based on model support, and costs will be calculated automatically using the registered pricing.
+**Done.** The registry automatically routes requests based on model name and calculates costs.
 
-### Code Conventions
+---
 
-This project follows strict Go coding conventions documented in [coding-conv.md](coding-conv.md):
+## Architecture
 
-- ✅ Early returns (circuit breaker pattern)
-- ✅ Avoid `else` statements
-- ✅ No named return values
-- ✅ Context as first argument in all interfaces
-- ✅ Separation of logic and data
-- ✅ No technology names in business logic
-- ✅ Dependency injection using dig
-- ✅ Use `require` (not `assert`) in tests
+### Layer Separation
 
-## Cost Calculation Architecture
+```
+HTTP Layer (handlers, middleware)
+    ↓
+Domain Layer (business logic, interfaces)
+    ↓
+Provider Layer (adapters for OpenAI, Anthropic, etc.)
+```
 
-The gateway automatically calculates and tracks the cost of LLM requests based on token usage:
+**Key Principle:** Providers only translate types. Business logic stays in domain.
 
 ### How It Works
 
-1. **Provider Layer**: Adapters return raw token counts (no cost calculation)
-2. **Domain Layer**: `GatewayService` enriches responses with cost using `CostCalculator`
-3. **Pricing Registry**: In-memory registry stores pricing per model (USD per 1K tokens)
-4. **Clean Separation**: Business logic (cost calculation) is separated from type translation (adapters)
+**Automatic Routing:**
+```go
+// Registry builds reverse index: model → provider
+registry.Register(ctx, openaiProvider)
+// Internally: modelToProvider["gpt-4"] = "openai"
 
-### Cost Calculation Flow
-
-```
-Request → Provider → Adapter → [tokens only] → Response
-                                                    ↓
-                                          GatewayService
-                                                    ↓
-                                          CostCalculator ← PricingRegistry
-                                                    ↓
-                                          Response + Cost
+// O(1) lookup at request time
+provider := registry.GetByModel(ctx, "gpt-4")
 ```
 
-### Benefits
+**Cost Calculation:**
+```
+Provider returns tokens → GatewayService → CostCalculator → PricingRegistry → Response + Cost
+```
 
-- **Testable**: Cost calculation can be tested independently of provider adapters
-- **Reusable**: All providers share the same cost calculation logic
-- **Maintainable**: Pricing updates don't require adapter changes
-- **Clean Architecture**: Business logic stays in the domain layer
+Providers don't calculate cost. Domain layer enriches responses.
 
-### Supported Models
+---
 
-Current pricing (as of implementation):
+## Project Structure
 
-| Model | Input (per 1K tokens) | Output (per 1K tokens) |
-|-------|----------------------|------------------------|
-| gpt-4 | $0.03 | $0.06 |
-| gpt-4-turbo | $0.01 | $0.03 |
-| gpt-3.5-turbo | $0.0005 | $0.0015 |
+```
+.
+├── cmd/main.go                    # Entry point, DI container
+├── internal/
+│   ├── domain/                    # Business logic
+│   │   ├── gateway.go            # Orchestration
+│   │   ├── cost_calculator.go    # Cost calculation
+│   │   ├── pricing_registry.go   # Pricing storage
+│   │   └── interfaces.go         # Core interfaces
+│   ├── provider/
+│   │   ├── registry/             # Provider registry
+│   │   ├── openai/               # OpenAI adapter
+│   │   └── echo/                 # Test provider
+│   ├── http/
+│   │   ├── handler.go            # HTTP handlers
+│   │   ├── server.go             # Server
+│   │   └── middleware/           # CORS, tracing
+│   ├── config/                    # Configuration
+│   └── observability/             # Logging
+└── go.mod
+```
 
-## Architecture Decisions
+---
 
-### Why Dependency Injection?
-Using `uber-go/dig` enables:
-- Testability through interface mocking
-- Loose coupling between components
-- Easy addition of new providers
-- Clear dependency graph
+## Testing
 
-### Why Provider Registry?
-The registry pattern with integrated routing allows:
-- Dynamic provider registration
-- Automatic model-based provider selection via `GetByModel()`
-- Type-safe provider discovery (returns Provider interface, not strings)
-- Single source of truth for provider management
-- Eliminates unnecessary abstraction layers
+```bash
+# Run all tests
+go test ./...
 
-### Why Event Bus?
-Publishing events instead of direct logging:
-- Decouples observability from business logic
-- Enables multiple event subscribers
-- Makes testing easier
-- Supports metrics, tracing, and logging from a single source
+# With coverage
+go test -cover ./...
 
-### Why Middleware Infrastructure?
-Composable middleware chain enables:
-- Separation of concerns (CORS, auth, tracing as independent components)
-- Explicit ordering and composition via `middleware.Chain()`
-- Easy addition of future middlewares (auth, rate limiting, metrics)
-- Type-safe middleware contracts
-- Testable in isolation
-- Follows standard Go middleware patterns
-
-## Troubleshooting
-
-### "Provider not found" error
-- Ensure the provider is enabled via environment variables
-- Check that the API key is set
-- Verify the model name is supported by at least one configured provider
-
-### Connection timeouts
-- Increase `OPENAI_TIMEOUT` environment variable
-- Check network connectivity to the LLM provider
-- Verify API key is valid
-
-### Build failures
-- Ensure Go 1.24.5+ is installed
-- Run `go mod tidy` to sync dependencies
-- Check for syntax errors in your code
-
-## License
-
-MIT License - See LICENSE file for details
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Follow the coding conventions in [coding-conv.md](coding-conv.md)
-4. Write unit tests using `require` assertions
-5. Ensure all tests pass: `go test ./...`
-6. Submit a pull request
-
-## Future Enhancements
-
-- [ ] Add authentication middleware (JWT/API keys)
-- [ ] Add rate limiting middleware
-- [ ] Add Anthropic provider
-- [ ] Add Google (Gemini) provider
-- [ ] Implement request/response caching
-- [ ] Add rate limiting
-- [ ] Add authentication/authorization
-- [ ] Implement request retries with exponential backoff
-- [ ] Add metrics endpoint (Prometheus)
-- [ ] Add distributed tracing (OpenTelemetry)
-- [ ] Implement circuit breaker pattern
-- [ ] Add load balancing across multiple provider instances
+# Regenerate mocks
+make mocks
+```
