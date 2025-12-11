@@ -1,6 +1,10 @@
 package middleware
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/davidbz/calcifer/internal/config"
+)
 
 // Middleware wraps an http.Handler with additional functionality.
 // Middlewares can be composed using the Chain function.
@@ -22,4 +26,13 @@ func Chain(middlewares ...Middleware) Middleware {
 		}
 		return final
 	}
+}
+
+// BuildMiddlewareChain composes the middleware chain for production.
+// Order matters: CORS -> Trace.
+func BuildMiddlewareChain(corsConfig *config.CORSConfig) Middleware {
+	return Chain(
+		CORS(corsConfig),
+		Trace(),
+	)
 }

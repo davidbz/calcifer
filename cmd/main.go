@@ -103,7 +103,7 @@ func buildContainer() *dig.Container {
 	if err := container.Provide(http.NewHandler); err != nil {
 		log.Fatalf("Failed to provide HTTP handler: %v", err)
 	}
-	if err := container.Provide(buildMiddlewareChain); err != nil {
+	if err := container.Provide(middleware.BuildMiddlewareChain); err != nil {
 		log.Fatalf("Failed to provide middleware chain: %v", err)
 	}
 	if err := container.Provide(http.NewServer); err != nil {
@@ -111,13 +111,4 @@ func buildContainer() *dig.Container {
 	}
 
 	return container
-}
-
-// buildMiddlewareChain composes the middleware chain for production.
-// Order matters: CORS -> Trace.
-func buildMiddlewareChain(corsConfig *config.CORSConfig) middleware.Middleware {
-	return middleware.Chain(
-		middleware.CORS(corsConfig),
-		middleware.Trace(),
-	)
 }
