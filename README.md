@@ -17,6 +17,7 @@ See [plan.md](plan.md) for detailed architecture documentation.
 ## Features
 
 ✅ Unified API for multiple LLM providers
+✅ Automatic provider routing based on model
 ✅ Streaming support via Server-Sent Events (SSE)
 ✅ Provider abstraction (no vendor lock-in)
 ✅ Dependency injection with uber-go/dig
@@ -121,10 +122,11 @@ The gateway will start on `http://localhost:8080` by default.
 
 ### Non-Streaming Completion
 
+The gateway automatically routes requests to the appropriate provider based on the model name:
+
 ```bash
 curl -X POST http://localhost:8080/v1/completions \
   -H "Content-Type: application/json" \
-  -H "X-Provider: openai" \
   -d '{
     "model": "gpt-4",
     "messages": [
@@ -156,7 +158,6 @@ Response:
 ```bash
 curl -X POST http://localhost:8080/v1/completions \
   -H "Content-Type: application/json" \
-  -H "X-Provider: openai" \
   -d '{
     "model": "gpt-4",
     "messages": [
@@ -318,7 +319,7 @@ Publishing events instead of direct logging:
 ### "Provider not found" error
 - Ensure the provider is enabled via environment variables
 - Check that the API key is set
-- Verify the provider name in the `X-Provider` header matches a registered provider
+- Verify the model name is supported by at least one configured provider
 
 ### Connection timeouts
 - Increase `OPENAI_TIMEOUT` environment variable

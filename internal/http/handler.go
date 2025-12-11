@@ -15,12 +15,14 @@ import (
 // Handler handles HTTP requests.
 type Handler struct {
 	gateway *domain.GatewayService
+	router  domain.Router
 }
 
 // NewHandler creates a new HTTP handler (DI constructor).
-func NewHandler(gateway *domain.GatewayService) *Handler {
+func NewHandler(gateway *domain.GatewayService, router domain.Router) *Handler {
 	return &Handler{
 		gateway: gateway,
+		router:  router,
 	}
 }
 
@@ -34,16 +36,6 @@ func (h *Handler) HandleCompletion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract provider from header.
-	provider := r.Header.Get("X-Provider")
-	if provider == "" {
-		http.Error(w, "provider not specified in X-Provider header", http.StatusBadRequest)
-		return
-	}
-
-	// Inject provider into context for downstream logging.
-	ctx = observability.WithProvider(ctx, provider)
-
 	// Parse request.
 	var req domain.CompletionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -51,8 +43,21 @@ func (h *Handler) HandleCompletion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Inject model into context for downstream logging.
+	if req.Model == "" {
+		http.Error(w, "model is required", http.StatusBadRequest)
+		return
+	}
+
+	// Route to provider based on model.
+	provider, err := h.router.Route(ctx, &domain.RouteRequest{Model: req.Model})
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to route request: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Inject model and provider into context for downstream logging.
 	ctx = observability.WithModel(ctx, req.Model)
+	ctx = observability.WithProvider(ctx, provider)
 
 	logger := observability.FromContext(ctx)
 	logger.Info("completion request received",
@@ -68,10 +73,10 @@ func (h *Handler) HandleCompletion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Non-streaming response.
-	response, err := h.gateway.Complete(ctx, provider, &req)
-	if err != nil {
-		logger.Error("completion failed", zap.Error(err))
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	response, execErr := h.gateway.Complete(ctx, provider, &req)
+	if execErr != nil {
+		logger.Error("completion failed", zap.Error(execErr))
+		http.Error(w, execErr.Error(), http.StatusInternalServerError)
 		return
 	}
 
