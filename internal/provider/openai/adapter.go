@@ -18,29 +18,6 @@ import (
 	"github.com/davidbz/calcifer/internal/observability"
 )
 
-const (
-	// GPT-4 pricing per 1K tokens
-	gpt4InputCostPer1K  = 0.03
-	gpt4OutputCostPer1K = 0.06
-
-	// GPT-4 Turbo pricing per 1K tokens
-	gpt4TurboInputCostPer1K  = 0.01
-	gpt4TurboOutputCostPer1K = 0.03
-
-	// GPT-3.5 Turbo pricing per 1K tokens
-	gpt35TurboInputCostPer1K  = 0.0005
-	gpt35TurboOutputCostPer1K = 0.0015
-
-	// Token conversion factor (tokens to per-1K)
-	tokensToPerK = 1000.0
-)
-
-// ModelConfig contains model configuration including pricing.
-type ModelConfig struct {
-	InputCostPer1K  float64 // USD per 1K input tokens
-	OutputCostPer1K float64 // USD per 1K output tokens
-}
-
 // Provider implements the domain.Provider interface for OpenAI
 type Provider struct {
 	client openai.Client
@@ -168,36 +145,13 @@ func (p *Provider) Name() string {
 
 // IsModelSupported checks if the provider supports the given model.
 func (p *Provider) IsModelSupported(_ context.Context, model string) bool {
-	config := p.getModelConfig(model)
-	return config.InputCostPer1K > 0 || config.OutputCostPer1K > 0
-}
-
-// getModelConfig returns the model configuration for a given model.
-func (p *Provider) getModelConfig(model string) ModelConfig {
-	modelConfigs := map[string]ModelConfig{
-		"gpt-4": {
-			InputCostPer1K:  gpt4InputCostPer1K,
-			OutputCostPer1K: gpt4OutputCostPer1K,
-		},
-		"gpt-4-turbo": {
-			InputCostPer1K:  gpt4TurboInputCostPer1K,
-			OutputCostPer1K: gpt4TurboOutputCostPer1K,
-		},
-		"gpt-3.5-turbo": {
-			InputCostPer1K:  gpt35TurboInputCostPer1K,
-			OutputCostPer1K: gpt35TurboOutputCostPer1K,
-		},
+	supportedModels := map[string]bool{
+		"gpt-4":         true,
+		"gpt-4-turbo":   true,
+		"gpt-3.5-turbo": true,
 	}
 
-	config, exists := modelConfigs[model]
-	if !exists {
-		return ModelConfig{
-			InputCostPer1K:  0,
-			OutputCostPer1K: 0,
-		}
-	}
-
-	return config
+	return supportedModels[model]
 }
 
 // toSDKParams converts domain request to SDK ChatCompletionNewParams
@@ -218,8 +172,9 @@ func (p *Provider) toSDKParams(req *domain.CompletionRequest) openai.ChatComplet
 		}
 	}
 
+	//nolint:exhaustruct // OpenAI SDK struct has many optional fields
 	params := openai.ChatCompletionNewParams{
-		Model:    openai.ChatModel(req.Model),
+		Model:    openai.ChatModel(req.Model), //nolint:unconvert // Type conversion required by SDK
 		Messages: messages,
 	}
 
@@ -234,29 +189,23 @@ func (p *Provider) toSDKParams(req *domain.CompletionRequest) openai.ChatComplet
 	return params
 }
 
-// toDomainResponse converts SDK response to domain response
+// toDomainResponse converts SDK response to domain response (WITHOUT cost calculation)
 func (p *Provider) toDomainResponse(resp *openai.ChatCompletion) *domain.CompletionResponse {
 	content := ""
 	if len(resp.Choices) > 0 {
 		content = resp.Choices[0].Message.Content
 	}
 
-	// Calculate cost based on token usage and model pricing
-	modelConfig := p.getModelConfig(string(resp.Model))
-	inputCost := float64(resp.Usage.PromptTokens) / tokensToPerK * modelConfig.InputCostPer1K
-	outputCost := float64(resp.Usage.CompletionTokens) / tokensToPerK * modelConfig.OutputCostPer1K
-	totalCost := inputCost + outputCost
-
 	return &domain.CompletionResponse{
 		ID:       resp.ID,
-		Model:    string(resp.Model),
+		Model:    resp.Model,
 		Provider: p.name,
 		Content:  content,
 		Usage: domain.Usage{
 			PromptTokens:     int(resp.Usage.PromptTokens),
 			CompletionTokens: int(resp.Usage.CompletionTokens),
 			TotalTokens:      int(resp.Usage.TotalTokens),
-			Cost:             totalCost,
+			Cost:             0, // Will be calculated by domain layer
 		},
 		FinishTime: time.Now(),
 	}

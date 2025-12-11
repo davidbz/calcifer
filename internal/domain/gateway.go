@@ -8,13 +8,15 @@ import (
 
 // GatewayService orchestrates requests to providers.
 type GatewayService struct {
-	registry ProviderRegistry
+	registry       ProviderRegistry
+	costCalculator CostCalculator
 }
 
 // NewGatewayService creates a new gateway service (DI constructor).
-func NewGatewayService(registry ProviderRegistry) *GatewayService {
+func NewGatewayService(registry ProviderRegistry, costCalculator CostCalculator) *GatewayService {
 	return &GatewayService{
-		registry: registry,
+		registry:       registry,
+		costCalculator: costCalculator,
 	}
 }
 
@@ -43,6 +45,10 @@ func (g *GatewayService) Complete(
 	if err != nil {
 		return nil, fmt.Errorf("completion failed: %w", err)
 	}
+
+	// Calculate cost in domain layer
+	cost, _ := g.costCalculator.Calculate(ctx, response.Model, response.Usage)
+	response.Usage.Cost = cost
 
 	return response, nil
 }
@@ -97,6 +103,10 @@ func (g *GatewayService) CompleteByModel(
 	if err != nil {
 		return nil, fmt.Errorf("completion failed: %w", err)
 	}
+
+	// Calculate cost in domain layer
+	cost, _ := g.costCalculator.Calculate(ctx, response.Model, response.Usage)
+	response.Usage.Cost = cost
 
 	return response, nil
 }

@@ -17,6 +17,7 @@ The AI Gateway follows clean architecture principles with clear separation of co
 ✅ Unified API for multiple LLM providers
 ✅ Automatic provider routing based on model
 ✅ Streaming support via Server-Sent Events (SSE)
+✅ **Token usage tracking and cost calculation**
 ✅ CORS support with configurable policies
 ✅ Composable HTTP middleware infrastructure
 ✅ Provider abstraction (no vendor lock-in)
@@ -37,15 +38,19 @@ The AI Gateway follows clean architecture principles with clear separation of co
 │   │   ├── models.go              # Domain models
 │   │   ├── interfaces.go          # Core interfaces
 │   │   ├── gateway.go             # Gateway service with auto-routing
-│   │   └── gateway_test.go        # Unit tests
+│   │   ├── pricing.go             # Pricing interfaces
+│   │   ├── cost_calculator.go     # Token-based cost calculation
+│   │   ├── pricing_registry.go    # In-memory pricing storage
+│   │   ├── gateway_test.go        # Unit tests
+│   │   └── cost_calculator_test.go # Cost calculation tests
 │   ├── provider/                   # Provider implementations
 │   │   ├── registry/
 │   │   │   ├── registry.go        # Provider registry with model routing
 │   │   │   └── registry_test.go   # Unit tests
 │   │   └── openai/
 │   │       ├── config.go          # OpenAI configuration
-│   │       ├── client.go          # OpenAI HTTP client
-│   │       └── adapter.go         # OpenAI adapter
+│   │       ├── adapter.go         # OpenAI adapter (type translation only)
+│   │       └── pricing.go         # OpenAI model pricing data
 │   ├── http/                       # HTTP layer
 │   │   ├── handler.go             # Request handlers
 │   │   ├── server.go              # HTTP server
@@ -154,7 +159,8 @@ Response:
   "usage": {
     "prompt_tokens": 12,
     "completion_tokens": 25,
-    "total_tokens": 37
+    "total_tokens": 37,
+    "cost": 0.00126
   },
   "finish_time": "2024-01-15T10:30:00Z"
 }
@@ -261,12 +267,55 @@ func (p *Provider) Name() string {
 
 func (p *Provider) IsModelSupported(ctx context.Context, model string) bool {
     // Return true if this provider supports the given model
-    // e.g., for Anthropic: model starts with "claude-"
-    return strings.HasPrefix(model, "claude-")
+    supportedModels := map[string]bool{
+        "claude-3-opus":   true,
+        "claude-3-sonnet": true,
+        "claude-3-haiku":  true,
+    }
+    return supportedModels[model]
 }
 ```
 
-3. Add configuration:
+3. Add pricing data:
+```go
+// internal/provider/anthropic/pricing.go
+package anthropic
+
+import (
+    "context"
+    "github.com/davidbz/calcifer/internal/domain"
+)
+
+const (
+    claude3OpusInputCostPer1K   = 0.015
+    claude3OpusOutputCostPer1K  = 0.075
+    claude3SonnetInputCostPer1K = 0.003
+    claude3SonnetOutputCostPer1K = 0.015
+)
+
+// RegisterPricing registers Anthropic model pricing with the registry.
+func RegisterPricing(ctx context.Context, registry domain.PricingRegistry) error {
+    models := map[string]domain.PricingConfig{
+        "claude-3-opus": {
+            InputCostPer1K:  claude3OpusInputCostPer1K,
+            OutputCostPer1K: claude3OpusOutputCostPer1K,
+        },
+        "claude-3-sonnet": {
+            InputCostPer1K:  claude3SonnetInputCostPer1K,
+            OutputCostPer1K: claude3SonnetOutputCostPer1K,
+        },
+    }
+
+    for model, config := range models {
+        if err := registry.RegisterPricing(ctx, model, config); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+
+4. Add configuration:
 ```go
 // internal/config/config.go
 type Config struct {
@@ -276,10 +325,11 @@ type Config struct {
 }
 ```
 
-4. Register in DI container and registry:
+5. Register in DI container and registry:
 ```go
 // cmd/main.go
-// First, provide the provider
+
+// 1. Provide the provider
 container.Provide(func(cfg *config.Config) (*anthropic.Provider, error) {
     if cfg.Anthropic.APIKey == "" {
         return nil, ErrProviderNotConfigured
@@ -287,16 +337,22 @@ container.Provide(func(cfg *config.Config) (*anthropic.Provider, error) {
     return anthropic.NewProvider(cfg.Anthropic)
 })
 
-// Then register it with the registry (in the Invoke section)
+// 2. Register it with the registry (in the Invoke section)
 container.Invoke(func(reg domain.ProviderRegistry, anthropicProvider *anthropic.Provider) error {
     if anthropicProvider != nil {
         return reg.Register(ctx, anthropicProvider)
     }
     return nil
 })
+
+// 3. Register pricing
+container.Invoke(func(pricingReg domain.PricingRegistry) error {
+    ctx := context.Background()
+    return anthropic.RegisterPricing(ctx, pricingReg)
+})
 ```
 
-The registry will automatically route requests to your provider based on model support.
+The registry will automatically route requests to your provider based on model support, and costs will be calculated automatically using the registered pricing.
 
 ### Code Conventions
 
@@ -310,6 +366,46 @@ This project follows strict Go coding conventions documented in [coding-conv.md]
 - ✅ No technology names in business logic
 - ✅ Dependency injection using dig
 - ✅ Use `require` (not `assert`) in tests
+
+## Cost Calculation Architecture
+
+The gateway automatically calculates and tracks the cost of LLM requests based on token usage:
+
+### How It Works
+
+1. **Provider Layer**: Adapters return raw token counts (no cost calculation)
+2. **Domain Layer**: `GatewayService` enriches responses with cost using `CostCalculator`
+3. **Pricing Registry**: In-memory registry stores pricing per model (USD per 1K tokens)
+4. **Clean Separation**: Business logic (cost calculation) is separated from type translation (adapters)
+
+### Cost Calculation Flow
+
+```
+Request → Provider → Adapter → [tokens only] → Response
+                                                    ↓
+                                          GatewayService
+                                                    ↓
+                                          CostCalculator ← PricingRegistry
+                                                    ↓
+                                          Response + Cost
+```
+
+### Benefits
+
+- **Testable**: Cost calculation can be tested independently of provider adapters
+- **Reusable**: All providers share the same cost calculation logic
+- **Maintainable**: Pricing updates don't require adapter changes
+- **Clean Architecture**: Business logic stays in the domain layer
+
+### Supported Models
+
+Current pricing (as of implementation):
+
+| Model | Input (per 1K tokens) | Output (per 1K tokens) |
+|-------|----------------------|------------------------|
+| gpt-4 | $0.03 | $0.06 |
+| gpt-4-turbo | $0.01 | $0.03 |
+| gpt-3.5-turbo | $0.0005 | $0.0015 |
 
 ## Architecture Decisions
 

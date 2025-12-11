@@ -12,6 +12,23 @@ import (
 	"github.com/davidbz/calcifer/internal/domain"
 )
 
+// mockCostCalculator is a mock implementation of CostCalculator for testing.
+type mockCostCalculator struct {
+	calculateFunc func(ctx context.Context, model string, usage domain.Usage) (float64, error)
+}
+
+func (m *mockCostCalculator) Calculate(ctx context.Context, model string, usage domain.Usage) (float64, error) {
+	if m.calculateFunc != nil {
+		return m.calculateFunc(ctx, model, usage)
+	}
+	// Default: return a simple calculation
+	return 0.001, nil
+}
+
+func newMockCostCalculator() *mockCostCalculator {
+	return &mockCostCalculator{}
+}
+
 // mockRegistry is a mock implementation of ProviderRegistry for testing.
 type mockRegistry struct {
 	providers map[string]domain.Provider
@@ -117,7 +134,8 @@ func (m *mockProvider) IsModelSupported(_ context.Context, model string) bool {
 func TestGatewayService_Complete(t *testing.T) {
 	t.Run("should complete request successfully", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		provider := &mockProvider{
 			name:            "test-provider",
@@ -150,7 +168,8 @@ func TestGatewayService_Complete(t *testing.T) {
 
 	t.Run("should return error when request is nil", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		ctx := context.Background()
 
@@ -163,7 +182,8 @@ func TestGatewayService_Complete(t *testing.T) {
 
 	t.Run("should return error when provider name is empty", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -186,7 +206,8 @@ func TestGatewayService_Complete(t *testing.T) {
 
 	t.Run("should return error when provider not found", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -209,7 +230,8 @@ func TestGatewayService_Complete(t *testing.T) {
 
 	t.Run("should return error when provider returns error", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		provider := &mockProvider{
 			name: "test-provider",
@@ -244,7 +266,8 @@ func TestGatewayService_Complete(t *testing.T) {
 func TestGatewayService_Stream(t *testing.T) {
 	t.Run("should stream request successfully", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		provider := &mockProvider{
 			name:            "test-provider",
@@ -285,7 +308,8 @@ func TestGatewayService_Stream(t *testing.T) {
 
 	t.Run("should return error when request is nil", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		ctx := context.Background()
 
@@ -298,7 +322,8 @@ func TestGatewayService_Stream(t *testing.T) {
 
 	t.Run("should return error when provider name is empty", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -319,7 +344,8 @@ func TestGatewayService_Stream(t *testing.T) {
 
 	t.Run("should return error when provider not found", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -342,7 +368,8 @@ func TestGatewayService_Stream(t *testing.T) {
 func TestGatewayService_CompleteByModel(t *testing.T) {
 	t.Run("should complete request with automatic routing", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		provider := &mockProvider{
 			name:            "openai",
@@ -374,7 +401,8 @@ func TestGatewayService_CompleteByModel(t *testing.T) {
 
 	t.Run("should return error when request is nil", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		ctx := context.Background()
 
@@ -387,7 +415,8 @@ func TestGatewayService_CompleteByModel(t *testing.T) {
 
 	t.Run("should return error when model is empty", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -406,7 +435,8 @@ func TestGatewayService_CompleteByModel(t *testing.T) {
 
 	t.Run("should return error when no provider supports model", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		provider := &mockProvider{
 			name:            "openai",
@@ -431,7 +461,8 @@ func TestGatewayService_CompleteByModel(t *testing.T) {
 
 	t.Run("should return error when provider fails", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		provider := &mockProvider{
 			name: "openai",
@@ -461,7 +492,8 @@ func TestGatewayService_CompleteByModel(t *testing.T) {
 func TestGatewayService_StreamByModel(t *testing.T) {
 	t.Run("should stream request with automatic routing", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		provider := &mockProvider{
 			name:            "openai",
@@ -499,7 +531,8 @@ func TestGatewayService_StreamByModel(t *testing.T) {
 
 	t.Run("should return error when request is nil", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		ctx := context.Background()
 
@@ -512,7 +545,8 @@ func TestGatewayService_StreamByModel(t *testing.T) {
 
 	t.Run("should return error when model is empty", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		ctx := context.Background()
 		req := &domain.CompletionRequest{
@@ -532,7 +566,8 @@ func TestGatewayService_StreamByModel(t *testing.T) {
 
 	t.Run("should return error when no provider supports model", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		provider := &mockProvider{
 			name:            "openai",
@@ -558,7 +593,8 @@ func TestGatewayService_StreamByModel(t *testing.T) {
 
 	t.Run("should return error when provider stream fails", func(t *testing.T) {
 		registry := newMockRegistry()
-		gateway := domain.NewGatewayService(registry)
+		costCalc := newMockCostCalculator()
+		gateway := domain.NewGatewayService(registry, costCalc)
 
 		provider := &mockProvider{
 			name: "openai",

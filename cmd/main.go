@@ -36,28 +36,45 @@ func main() {
 func buildContainer() *dig.Container {
 	container := dig.New()
 
-	// Configuration
-	if err := container.Provide(config.Load); err != nil {
-		log.Fatalf("Failed to provide config: %v", err)
-	}
-	if err := container.Provide(config.ParseDependenciesConfig); err != nil {
-		log.Fatalf("Failed to provide config dependencies: %v", err)
-	}
+	provideConfig(container)
+	provideObservability(container)
+	provideRegistries(container)
+	provideCostCalculator(container)
+	provideOpenAI(container)
+	registerProviders(container)
+	registerPricing(container)
+	provideDomainServices(container)
+	provideHTTPLayer(container)
 
-	// Observability
-	if err := container.Provide(observability.InitLogger); err != nil {
-		log.Fatalf("Failed to provide logger: %v", err)
-	}
+	return container
+}
 
-	// Provider Registry
-	if err := container.Provide(func() domain.ProviderRegistry {
+func provideConfig(container *dig.Container) {
+	mustProvide(container, config.Load)
+	mustProvide(container, config.ParseDependenciesConfig)
+}
+
+func provideObservability(container *dig.Container) {
+	mustProvide(container, observability.InitLogger)
+}
+
+func provideRegistries(container *dig.Container) {
+	mustProvide(container, func() domain.ProviderRegistry {
 		return registry.NewRegistry()
-	}); err != nil {
-		log.Fatalf("Failed to provide registry: %v", err)
-	}
+	})
+	mustProvide(container, func() domain.PricingRegistry {
+		return domain.NewInMemoryPricingRegistry()
+	})
+}
 
-	// OpenAI Provider
-	if err := container.Provide(func(cfg *config.Config) (*openai.Provider, error) {
+func provideCostCalculator(container *dig.Container) {
+	mustProvide(container, func(reg domain.PricingRegistry) domain.CostCalculator {
+		return domain.NewStandardCostCalculator(reg)
+	})
+}
+
+func provideOpenAI(container *dig.Container) {
+	mustProvide(container, func(cfg *config.Config) (*openai.Provider, error) {
 		if cfg.OpenAI.APIKey == "" {
 			return nil, ErrProviderNotConfigured
 		}
@@ -68,18 +85,16 @@ func buildContainer() *dig.Container {
 			Timeout:    cfg.OpenAI.Timeout,
 			MaxRetries: cfg.OpenAI.MaxRetries,
 		})
-	}); err != nil {
-		log.Fatalf("Failed to provide OpenAI provider: %v", err)
-	}
+	})
+}
 
-	// Register providers with registry (invoked for side effects)
-	if err := container.Invoke(func(
+func registerProviders(container *dig.Container) {
+	err := container.Invoke(func(
 		reg domain.ProviderRegistry,
 		openaiProvider *openai.Provider,
 	) error {
 		ctx := context.Background()
 
-		// Register OpenAI if enabled
 		if openaiProvider != nil {
 			if err := reg.Register(ctx, openaiProvider); err != nil {
 				return fmt.Errorf("failed to register OpenAI provider: %w", err)
@@ -87,28 +102,37 @@ func buildContainer() *dig.Container {
 		}
 
 		return nil
-	}); err != nil {
-		// Ignore ErrProviderNotConfigured as it's expected for optional providers
-		if !errors.Is(err, ErrProviderNotConfigured) {
-			log.Fatalf("Failed to register providers: %v", err)
-		}
+	})
+	if err != nil && !errors.Is(err, ErrProviderNotConfigured) {
+		log.Fatalf("Failed to register providers: %v", err)
 	}
+}
 
-	// Domain Services
-	if err := container.Provide(domain.NewGatewayService); err != nil {
-		log.Fatalf("Failed to provide gateway service: %v", err)
-	}
+func registerPricing(container *dig.Container) {
+	mustInvoke(container, func(pricingReg domain.PricingRegistry) error {
+		ctx := context.Background()
+		return openai.RegisterPricing(ctx, pricingReg)
+	})
+}
 
-	// HTTP Layer
-	if err := container.Provide(http.NewHandler); err != nil {
-		log.Fatalf("Failed to provide HTTP handler: %v", err)
-	}
-	if err := container.Provide(middleware.BuildMiddlewareChain); err != nil {
-		log.Fatalf("Failed to provide middleware chain: %v", err)
-	}
-	if err := container.Provide(http.NewServer); err != nil {
-		log.Fatalf("Failed to provide HTTP server: %v", err)
-	}
+func provideDomainServices(container *dig.Container) {
+	mustProvide(container, domain.NewGatewayService)
+}
 
-	return container
+func provideHTTPLayer(container *dig.Container) {
+	mustProvide(container, http.NewHandler)
+	mustProvide(container, middleware.BuildMiddlewareChain)
+	mustProvide(container, http.NewServer)
+}
+
+func mustProvide(container *dig.Container, constructor any) {
+	if err := container.Provide(constructor); err != nil {
+		log.Fatalf("Failed to provide dependency: %v", err)
+	}
+}
+
+func mustInvoke(container *dig.Container, function any) {
+	if err := container.Invoke(function); err != nil {
+		log.Fatalf("Failed to invoke function: %v", err)
+	}
 }
