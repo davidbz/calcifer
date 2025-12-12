@@ -2,6 +2,7 @@ package httpserver //nolint:testpackage // Need access to unexported setCacheHea
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -372,4 +373,310 @@ func TestHandleHealth(t *testing.T) {
 	err := json.NewDecoder(w.Body).Decode(&response)
 	require.NoError(t, err)
 	require.Equal(t, "healthy", response["status"])
+}
+
+// Streaming Tests
+
+func TestHandleCompletion_Streaming_Success(t *testing.T) {
+	mockRegistry := mocks.NewMockProviderRegistry(t)
+	mockCostCalc := mocks.NewMockCostCalculator(t)
+
+	gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
+	handler := NewHandler(gateway)
+
+	req := domain.CompletionRequest{
+		Model: "gpt-4",
+		Messages: []domain.Message{
+			{Role: "user", Content: "Hello"},
+		},
+		Stream: true,
+	}
+
+	// Create mock stream channel
+	chunks := make(chan domain.StreamChunk, 3)
+	chunks <- domain.StreamChunk{
+		Delta: "Hello",
+		Done:  false,
+		Error: nil,
+	}
+	chunks <- domain.StreamChunk{
+		Delta: " world",
+		Done:  false,
+		Error: nil,
+	}
+	chunks <- domain.StreamChunk{
+		Delta: "!",
+		Done:  true,
+		Error: nil,
+	}
+	close(chunks)
+
+	// Create mock provider and set expectations
+	mockProvider := mocks.NewMockProvider(t)
+	mockProvider.EXPECT().
+		Stream(mock.Anything, &req).
+		Return(chunks, nil)
+
+	mockRegistry.EXPECT().
+		GetByModel(mock.Anything, "gpt-4").
+		Return(mockProvider, nil)
+
+	reqBody, _ := json.Marshal(req)
+	httpReq := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewReader(reqBody))
+	w := httptest.NewRecorder()
+
+	handler.HandleCompletion(w, httpReq)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "text/event-stream", w.Header().Get("Content-Type"))
+	require.Equal(t, "no-cache", w.Header().Get("Cache-Control"))
+	require.Equal(t, "keep-alive", w.Header().Get("Connection"))
+
+	// Verify we got SSE formatted output
+	body := w.Body.String()
+	require.Contains(t, body, "data: ")
+	require.Contains(t, body, "Hello")
+	require.Contains(t, body, "world")
+}
+
+func TestHandleCompletion_Streaming_WithCache(t *testing.T) {
+	mockRegistry := mocks.NewMockProviderRegistry(t)
+	mockCostCalc := mocks.NewMockCostCalculator(t)
+	mockCache := mocks.NewMockSemanticCache(t)
+
+	gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, mockCache)
+	handler := NewHandler(gateway)
+
+	req := domain.CompletionRequest{
+		Model: "gpt-4",
+		Messages: []domain.Message{
+			{Role: "user", Content: "Hello"},
+		},
+		Stream: true,
+	}
+
+	// Create mock stream channel
+	chunks := make(chan domain.StreamChunk, 2)
+	chunks <- domain.StreamChunk{
+		Delta: "Cached response",
+		Done:  false,
+		Error: nil,
+	}
+	chunks <- domain.StreamChunk{
+		Delta: "",
+		Done:  true,
+		Error: nil,
+	}
+	close(chunks)
+
+	// Mock cache miss for streaming (cache doesn't support streaming per design)
+	mockCache.EXPECT().
+		Get(mock.Anything, &req).
+		Return(nil, domain.ErrCacheMiss)
+
+	mockProvider := mocks.NewMockProvider(t)
+	mockProvider.EXPECT().
+		Stream(mock.Anything, &req).
+		Return(chunks, nil)
+
+	mockRegistry.EXPECT().
+		GetByModel(mock.Anything, "gpt-4").
+		Return(mockProvider, nil)
+
+	// Mock cache set for streaming (buffers the stream)
+	mockCache.EXPECT().
+		Set(mock.Anything, &req, mock.Anything, mock.Anything).
+		Return(nil).
+		Maybe()
+
+	reqBody, _ := json.Marshal(req)
+	httpReq := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewReader(reqBody))
+	w := httptest.NewRecorder()
+
+	handler.HandleCompletion(w, httpReq)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "text/event-stream", w.Header().Get("Content-Type"))
+
+	// Note: Per design doc, streaming does NOT support cache headers
+	require.Empty(t, w.Header().Get("X-Calcifer-Cache"))
+
+	body := w.Body.String()
+	require.Contains(t, body, "data: ")
+	require.Contains(t, body, "Cached response")
+}
+
+func TestHandleCompletion_Streaming_ProviderError(t *testing.T) {
+	mockRegistry := mocks.NewMockProviderRegistry(t)
+	mockCostCalc := mocks.NewMockCostCalculator(t)
+
+	gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
+	handler := NewHandler(gateway)
+
+	req := domain.CompletionRequest{
+		Model: "gpt-4",
+		Messages: []domain.Message{
+			{Role: "user", Content: "Hello"},
+		},
+		Stream: true,
+	}
+
+	mockProvider := mocks.NewMockProvider(t)
+	mockProvider.EXPECT().
+		Stream(mock.Anything, &req).
+		Return(nil, errors.New("provider unavailable"))
+
+	mockRegistry.EXPECT().
+		GetByModel(mock.Anything, "gpt-4").
+		Return(mockProvider, nil)
+
+	reqBody, _ := json.Marshal(req)
+	httpReq := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewReader(reqBody))
+	w := httptest.NewRecorder()
+
+	handler.HandleCompletion(w, httpReq)
+
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestHandleCompletion_Streaming_ChunkError(t *testing.T) {
+	mockRegistry := mocks.NewMockProviderRegistry(t)
+	mockCostCalc := mocks.NewMockCostCalculator(t)
+
+	gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
+	handler := NewHandler(gateway)
+
+	req := domain.CompletionRequest{
+		Model: "gpt-4",
+		Messages: []domain.Message{
+			{Role: "user", Content: "Hello"},
+		},
+		Stream: true,
+	}
+
+	// Create mock stream channel with error
+	chunks := make(chan domain.StreamChunk, 2)
+	chunks <- domain.StreamChunk{
+		Delta: "Start",
+		Done:  false,
+		Error: nil,
+	}
+	chunks <- domain.StreamChunk{
+		Delta: "",
+		Done:  false,
+		Error: errors.New("stream error occurred"),
+	}
+	close(chunks)
+
+	mockProvider := mocks.NewMockProvider(t)
+	mockProvider.EXPECT().
+		Stream(mock.Anything, &req).
+		Return(chunks, nil)
+
+	mockRegistry.EXPECT().
+		GetByModel(mock.Anything, "gpt-4").
+		Return(mockProvider, nil)
+
+	reqBody, _ := json.Marshal(req)
+	httpReq := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewReader(reqBody))
+	w := httptest.NewRecorder()
+
+	handler.HandleCompletion(w, httpReq)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	body := w.Body.String()
+	require.Contains(t, body, "event: error")
+	require.Contains(t, body, "stream error occurred")
+}
+
+func TestHandleCompletion_Streaming_ContextCancellation(t *testing.T) {
+	mockRegistry := mocks.NewMockProviderRegistry(t)
+	mockCostCalc := mocks.NewMockCostCalculator(t)
+
+	gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
+	handler := NewHandler(gateway)
+
+	req := domain.CompletionRequest{
+		Model: "gpt-4",
+		Messages: []domain.Message{
+			{Role: "user", Content: "Hello"},
+		},
+		Stream: true,
+	}
+
+	// Create mock stream channel that never closes
+	chunks := make(chan domain.StreamChunk, 1)
+	chunks <- domain.StreamChunk{
+		Delta: "Start",
+		Done:  false,
+		Error: nil,
+	}
+	// Don't close or send more - simulate long-running stream
+
+	mockProvider := mocks.NewMockProvider(t)
+	mockProvider.EXPECT().
+		Stream(mock.Anything, &req).
+		Return(chunks, nil)
+
+	mockRegistry.EXPECT().
+		GetByModel(mock.Anything, "gpt-4").
+		Return(mockProvider, nil)
+
+	reqBody, _ := json.Marshal(req)
+
+	// Create request with cancellable context
+	ctx, cancel := context.WithCancel(context.Background())
+	httpReq := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewReader(reqBody))
+	httpReq = httpReq.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+
+	// Cancel context after a short delay to simulate client disconnect
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	handler.HandleCompletion(w, httpReq)
+
+	// Should complete without panic/error due to context cancellation
+	require.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestHandleCompletion_Streaming_EmptyChunks(t *testing.T) {
+	mockRegistry := mocks.NewMockProviderRegistry(t)
+	mockCostCalc := mocks.NewMockCostCalculator(t)
+
+	gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, nil)
+	handler := NewHandler(gateway)
+
+	req := domain.CompletionRequest{
+		Model: "gpt-4",
+		Messages: []domain.Message{
+			{Role: "user", Content: "Hello"},
+		},
+		Stream: true,
+	}
+
+	// Create mock stream channel that closes immediately
+	chunks := make(chan domain.StreamChunk)
+	close(chunks)
+
+	mockProvider := mocks.NewMockProvider(t)
+	mockProvider.EXPECT().
+		Stream(mock.Anything, &req).
+		Return(chunks, nil)
+
+	mockRegistry.EXPECT().
+		GetByModel(mock.Anything, "gpt-4").
+		Return(mockProvider, nil)
+
+	reqBody, _ := json.Marshal(req)
+	httpReq := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewReader(reqBody))
+	w := httptest.NewRecorder()
+
+	handler.HandleCompletion(w, httpReq)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "text/event-stream", w.Header().Get("Content-Type"))
 }
