@@ -18,3 +18,12 @@ packages:
       PricingRegistry:
         config:
           with-expecter: true
+      SemanticCache:
+        config:
+          with-expecter: true
+      EmbeddingGenerator:
+        config:
+          with-expecter: true
+      SimilaritySearch:
+        config:
+          with-expecter: true

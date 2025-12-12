@@ -1,6 +1,8 @@
 package config
 
 import (
+	"time"
+
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
 	"go.uber.org/dig"
@@ -13,6 +15,8 @@ type Config struct {
 	Server ServerConfig
 	CORS   CORSConfig
 	OpenAI openai.Config
+	Cache  CacheConfig
+	Redis  RedisConfig
 }
 
 // ServerConfig contains HTTP server settings.
@@ -31,12 +35,31 @@ type CORSConfig struct {
 	MaxAge           int      `env:"CORS_MAX_AGE"                            envDefault:"86400"`
 }
 
+// CacheConfig contains semantic cache settings.
+type CacheConfig struct {
+	Enabled             bool          `env:"CACHE_ENABLED"              envDefault:"false"`
+	SimilarityThreshold float64       `env:"CACHE_SIMILARITY_THRESHOLD" envDefault:"0.85"`
+	TTL                 time.Duration `env:"CACHE_TTL"                  envDefault:"1h"`
+	EmbeddingModel      string        `env:"CACHE_EMBEDDING_MODEL"      envDefault:"text-embedding-ada-002"`
+	EmbeddingAPIKey     string        `env:"OPENAI_API_KEY"`
+}
+
+// RedisConfig contains Redis connection settings.
+type RedisConfig struct {
+	URL       string `env:"REDIS_URL"        envDefault:"redis://localhost:6379"`
+	Password  string `env:"REDIS_PASSWORD"`
+	DB        int    `env:"REDIS_DB"         envDefault:"0"`
+	IndexName string `env:"REDIS_INDEX_NAME" envDefault:"calcifer_cache"`
+}
+
 // DepConfig is used for dependency injection with dig.
 type DepConfig struct {
 	dig.Out
 	*ServerConfig
 	*CORSConfig
 	*openai.Config
+	*CacheConfig
+	*RedisConfig
 }
 
 // Load loads environment files and parses configuration.
@@ -60,5 +83,7 @@ func ParseDependenciesConfig(cfg *Config) DepConfig {
 		&cfg.Server,
 		&cfg.CORS,
 		&cfg.OpenAI,
+		&cfg.Cache,
+		&cfg.Redis,
 	}
 }

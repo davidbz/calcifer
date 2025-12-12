@@ -28,6 +28,20 @@ type CompletionResponse struct {
 	FinishTime time.Time `json:"finish_time"`
 }
 
+// CacheInfo holds cache metadata (infrastructure concern).
+// This is returned alongside the domain response and handled by the HTTP layer.
+type CacheInfo struct {
+	Hit             bool
+	SimilarityScore float64
+	CachedAt        time.Time
+}
+
+// CompletionResult packages the domain response with optional cache metadata.
+type CompletionResult struct {
+	Response  *CompletionResponse
+	CacheInfo *CacheInfo
+}
+
 // StreamChunk represents a single streaming response chunk.
 type StreamChunk struct {
 	Delta string `json:"delta"`
