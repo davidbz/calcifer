@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/davidbz/calcifer/internal/domain"
 	"github.com/davidbz/calcifer/internal/observability"
@@ -59,8 +61,8 @@ func (h *Handler) HandleCompletion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Non-streaming response.
-	response, execErr := h.gateway.CompleteByModel(ctx, &req)
+	// Non-streaming response - returns domain response + cache metadata separately
+	result, execErr := h.gateway.CompleteByModel(ctx, &req)
 	if execErr != nil {
 		logger.Error("completion failed", observability.Error(execErr))
 		http.Error(w, execErr.Error(), http.StatusInternalServerError)
@@ -68,12 +70,16 @@ func (h *Handler) HandleCompletion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Info("completion succeeded",
-		observability.Int("tokens", response.Usage.TotalTokens),
-		observability.Float64("cost", response.Usage.Cost),
+		observability.Int("tokens", result.Response.Usage.TotalTokens),
+		observability.Float64("cost", result.Response.Usage.Cost),
 	)
 
+	// Set cache headers from separate cache metadata (infrastructure concern)
+	setCacheHeaders(w, result.CacheInfo)
+
+	// Encode domain response to JSON (business data only)
 	w.Header().Set("Content-Type", "application/json")
-	encodeErr := json.NewEncoder(w).Encode(response)
+	encodeErr := json.NewEncoder(w).Encode(result.Response)
 	if encodeErr != nil {
 		logger.Error("failed to encode response", observability.Error(encodeErr))
 		http.Error(w, fmt.Sprintf("failed to encode response: %v", encodeErr), http.StatusInternalServerError)
@@ -141,6 +147,25 @@ func (h *Handler) handleStreamByModel(
 			}
 		}
 	}
+}
+
+// setCacheHeaders sets cache-related HTTP headers based on cache metadata.
+func setCacheHeaders(w http.ResponseWriter, cacheInfo *domain.CacheInfo) {
+	if cacheInfo == nil {
+		return
+	}
+
+	if cacheInfo.Hit {
+		w.Header().Set("X-Calcifer-Cache", "HIT")
+		w.Header().Set("X-Calcifer-Cache-Similarity", fmt.Sprintf("%.4f", cacheInfo.SimilarityScore))
+		w.Header().Set("X-Calcifer-Cache-Timestamp", cacheInfo.CachedAt.Format(time.RFC3339))
+
+		age := int(time.Since(cacheInfo.CachedAt).Seconds())
+		w.Header().Set("X-Calcifer-Cache-Age", strconv.Itoa(age))
+		return
+	}
+
+	w.Header().Set("X-Calcifer-Cache", "MISS")
 }
 
 // HandleHealth handles health check requests.

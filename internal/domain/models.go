@@ -20,20 +20,26 @@ type Message struct {
 
 // CompletionResponse represents a unified LLM response.
 type CompletionResponse struct {
-	ID         string         `json:"id"`
-	Model      string         `json:"model"`
-	Provider   string         `json:"provider"`
-	Content    string         `json:"content"`
-	Usage      Usage          `json:"usage"`
-	FinishTime time.Time      `json:"finish_time"`
-	Cache      *CacheMetadata `json:"cache,omitempty"`
+	ID         string    `json:"id"`
+	Model      string    `json:"model"`
+	Provider   string    `json:"provider"`
+	Content    string    `json:"content"`
+	Usage      Usage     `json:"usage"`
+	FinishTime time.Time `json:"finish_time"`
 }
 
-// CacheMetadata provides cache status information.
-type CacheMetadata struct {
-	Hit             bool       `json:"hit"`
-	SimilarityScore float64    `json:"similarity_score,omitempty"`
-	CachedAt        *time.Time `json:"cached_at,omitempty"`
+// CacheInfo holds cache metadata (infrastructure concern).
+// This is returned alongside the domain response and handled by the HTTP layer.
+type CacheInfo struct {
+	Hit             bool
+	SimilarityScore float64
+	CachedAt        time.Time
+}
+
+// CompletionResult packages the domain response with optional cache metadata.
+type CompletionResult struct {
+	Response  *CompletionResponse
+	CacheInfo *CacheInfo
 }
 
 // StreamChunk represents a single streaming response chunk.

@@ -53,6 +53,25 @@ curl -X POST http://localhost:8080/v1/completions \
 }
 ```
 
+**Cache Status** (when semantic caching enabled):
+
+Cache information is returned via HTTP response headers:
+
+```bash
+# Cache hit example
+curl -i http://localhost:8080/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "gpt-4", "messages": [{"role": "user", "content": "Hello"}]}'
+
+# Response headers:
+# X-Calcifer-Cache: HIT
+# X-Calcifer-Cache-Similarity: 0.9600
+# X-Calcifer-Cache-Timestamp: 2024-01-15T09:30:00Z
+# X-Calcifer-Cache-Age: 120
+```
+
+Cached responses have `cost: 0.0` (cache hits are free).
+
 ### Testing Without API Keys
 
 Use the built-in `echo4` model for testing (no API key required):
@@ -105,6 +124,16 @@ Environment variables:
 - `REDIS_DB` - Redis database number (default: 0)
 
 > **Note:** Semantic cache uses vector similarity to cache responses. Requires Redis with vector search support (RedisStack).
+
+**Cache Observability:**
+
+Cache status is available via HTTP response headers:
+- `X-Calcifer-Cache`: Either `HIT` or `MISS`
+- `X-Calcifer-Cache-Similarity`: Similarity score for cache hits (e.g., `0.9600`)
+- `X-Calcifer-Cache-Timestamp`: When the response was cached (RFC3339 format)
+- `X-Calcifer-Cache-Age`: Age in seconds since caching
+
+**Note**: Cache headers are only present when `CACHE_ENABLED=true`. Streaming requests (SSE) do not currently include cache headers.
 
 ---
 

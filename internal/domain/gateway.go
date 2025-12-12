@@ -86,7 +86,7 @@ func (g *GatewayService) Stream(
 }
 
 // tryGetFromCache checks cache and returns early if found.
-func (g *GatewayService) tryGetFromCache(ctx context.Context, req *CompletionRequest) (*CompletionResponse, bool) {
+func (g *GatewayService) tryGetFromCache(ctx context.Context, req *CompletionRequest) (*CompletionResult, bool) {
 	if g.cache == nil {
 		return nil, false
 	}
@@ -111,17 +111,18 @@ func (g *GatewayService) tryGetFromCache(ctx context.Context, req *CompletionReq
 		observability.Float64("similarity_score", cached.SimilarityScore),
 		observability.String("cached_model", cached.Response.Model))
 
-	// Populate cache metadata
-	cached.Response.Cache = &CacheMetadata{
-		Hit:             true,
-		SimilarityScore: cached.SimilarityScore,
-		CachedAt:        &cached.CachedAt,
-	}
-
 	// Cache hits are free
 	cached.Response.Usage.Cost = 0.0
 
-	return cached.Response, true
+	// Return domain response with separate cache metadata
+	return &CompletionResult{
+		Response: cached.Response,
+		CacheInfo: &CacheInfo{
+			Hit:             true,
+			SimilarityScore: cached.SimilarityScore,
+			CachedAt:        cached.CachedAt,
+		},
+	}, true
 }
 
 // storeInCache attempts to cache the response.
@@ -141,7 +142,7 @@ func (g *GatewayService) storeInCache(ctx context.Context, req *CompletionReques
 func (g *GatewayService) CompleteByModel(
 	ctx context.Context,
 	req *CompletionRequest,
-) (*CompletionResponse, error) {
+) (*CompletionResult, error) {
 	if req == nil {
 		return nil, errors.New("request cannot be nil")
 	}
@@ -174,7 +175,20 @@ func (g *GatewayService) CompleteByModel(
 	// Store in cache
 	g.storeInCache(ctx, req, response)
 
-	return response, nil
+	// Build result with cache miss info (if cache enabled)
+	result := &CompletionResult{
+		Response:  response,
+		CacheInfo: nil,
+	}
+	if g.cache != nil {
+		result.CacheInfo = &CacheInfo{
+			Hit:             false,
+			SimilarityScore: 0,
+			CachedAt:        time.Time{},
+		}
+	}
+
+	return result, nil
 }
 
 // tryGetStreamFromCache checks cache for streaming requests.
@@ -202,13 +216,6 @@ func (g *GatewayService) tryGetStreamFromCache(ctx context.Context, req *Complet
 	logger.Info("cache HIT - streaming cached response",
 		observability.Float64("similarity_score", cached.SimilarityScore),
 		observability.String("cached_model", cached.Response.Model))
-
-	// Populate cache metadata
-	cached.Response.Cache = &CacheMetadata{
-		Hit:             true,
-		SimilarityScore: cached.SimilarityScore,
-		CachedAt:        &cached.CachedAt,
-	}
 
 	// Cache hits are free
 	cached.Response.Usage.Cost = 0.0
@@ -340,7 +347,6 @@ func (g *GatewayService) cacheStreamWrapper(
 					Cost:             0,
 				},
 				FinishTime: time.Now(),
-				Cache:      nil,
 			}
 
 			// Detach context for async cache operation (original request context is canceled)

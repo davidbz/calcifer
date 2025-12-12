@@ -253,6 +253,5 @@ func (p *Provider) toDomainResponse(resp *openai.ChatCompletion) *domain.Complet
 			Cost:             0, // Will be calculated by domain layer
 		},
 		FinishTime: time.Now(),
-		Cache:      nil,
 	}
 }

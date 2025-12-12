@@ -222,11 +222,23 @@ Request → Generate Embedding → Vector Search →
 **Cache Key**: SHA256 hash of normalized request text
 
 **Cache Metadata**:
-When a response is served from cache, the response includes cache metadata:
-- `hit`: `true` for cache hits, omitted for cache misses
-- `similarity_score`: Vector similarity score (0-1) indicating how similar the cached query was
-- `cached_at`: Timestamp when the response was originally cached
-- `cost`: Automatically set to `0.0` for cache hits (cache hits are free)
+When semantic caching is enabled, cache status is returned via HTTP response headers:
+
+**Cache Hit Headers**:
+- `X-Calcifer-Cache: HIT` - Indicates response served from cache
+- `X-Calcifer-Cache-Similarity: 0.9600` - Vector similarity score (0.00-1.00)
+- `X-Calcifer-Cache-Timestamp: 2024-01-15T09:30:00Z` - When response was cached (RFC3339)
+- `X-Calcifer-Cache-Age: 3600` - Age of cached entry in seconds
+
+**Cache Miss Headers**:
+- `X-Calcifer-Cache: MISS` - Indicates response from provider (not cached)
+
+**Cache Disabled**:
+- No cache headers present
+
+**Note**: Cache hits always have `cost: 0.0` in the usage field (cache hits are free).
+
+**Streaming Limitation**: Cache headers are not currently supported for streaming requests (SSE). Cache status for streaming requests is available in server logs only.
 
 ### 6. HTTP Handler (`internal/httpserver/handler.go`)
 
@@ -262,6 +274,11 @@ When a response is served from cache, the response includes cache metadata:
 }
 ```
 
+**Cache Headers** (when cache enabled):
+```http
+X-Calcifer-Cache: MISS
+```
+
 **Response Format with Cache Hit**:
 ```json
 {
@@ -275,13 +292,16 @@ When a response is served from cache, the response includes cache metadata:
     "total_tokens": 37,
     "cost": 0.0
   },
-  "cache": {
-    "hit": true,
-    "similarity_score": 0.96,
-    "cached_at": "2024-01-15T09:30:00Z"
-  },
   "finish_time": "2024-01-15T10:30:00Z"
 }
+```
+
+**Cache Headers** (cache hit):
+```http
+X-Calcifer-Cache: HIT
+X-Calcifer-Cache-Similarity: 0.9600
+X-Calcifer-Cache-Timestamp: 2024-01-15T09:30:00Z
+X-Calcifer-Cache-Age: 3600
 ```
 
 ---
