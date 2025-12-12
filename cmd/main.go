@@ -146,11 +146,18 @@ func provideCache(container *dig.Container) {
 	})
 
 	// Provide SimilaritySearch (optional - returns nil if Redis client is nil)
-	mustProvide(container, func(client *redisClient.Client, cfg *config.RedisConfig) (domain.SimilaritySearch, error) {
+	mustProvide(container, func(
+		client *redisClient.Client,
+		cfg *config.RedisConfig,
+		embeddingGen domain.EmbeddingGenerator,
+	) (domain.SimilaritySearch, error) {
 		if client == nil {
 			return nil, ErrProviderNotConfigured
 		}
-		return redisCache.NewVectorSearch(client, cfg.IndexName)
+		if embeddingGen == nil {
+			return nil, errors.New("embedding generator required for vector search")
+		}
+		return redisCache.NewVectorSearch(client, cfg.IndexName, embeddingGen.Dimension())
 	})
 
 	// Provide EmbeddingGenerator (optional - returns nil if cache not enabled)

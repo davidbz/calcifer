@@ -20,15 +20,17 @@ const (
 
 // VectorSearch implements vector similarity search using Redis.
 type VectorSearch struct {
-	client    *redis.Client
-	indexName string
+	client             *redis.Client
+	indexName          string
+	embeddingDimension int
 }
 
 // NewVectorSearch creates a new Redis vector search adapter.
-func NewVectorSearch(client *redis.Client, indexName string) (*VectorSearch, error) {
+func NewVectorSearch(client *redis.Client, indexName string, embeddingDimension int) (*VectorSearch, error) {
 	v := &VectorSearch{
-		client:    client,
-		indexName: indexName,
+		client:             client,
+		indexName:          indexName,
+		embeddingDimension: embeddingDimension,
 	}
 
 	if err := v.createIndex(); err != nil {
@@ -138,14 +140,25 @@ func (v *VectorSearch) Index(
 // createIndex creates the Redis search index if it doesn't exist.
 func (v *VectorSearch) createIndex() error {
 	ctx := context.Background()
+	logger := observability.FromContext(ctx)
 
-	// Drop index if it exists (recreate for clean state)
-	_ = v.client.FTDropIndex(ctx, v.indexName).Err()
+	// Check if index already exists
+	_, err := v.client.FTInfo(ctx, v.indexName).Result()
+	if err == nil {
+		// Index exists
+		logger.Info("redis search index already exists, skipping creation",
+			observability.String("index_name", v.indexName))
+		return nil
+	}
 
-	// Create index using type-safe API
-	embeddingDimension := v.embeddingGenerator.Dimension()
+	// Index doesn't exist, create it
+	logger.Info("creating redis search index",
+		observability.String("index_name", v.indexName),
+		observability.Int("embedding_dimension", v.embeddingDimension))
 
-	_, err := v.client.FTCreate(ctx, v.indexName,
+	embeddingDimension := v.embeddingDimension
+
+	_, err = v.client.FTCreate(ctx, v.indexName,
 		&redis.FTCreateOptions{
 			OnHash: true,
 			Prefix: []any{"cache:"},
@@ -174,6 +187,9 @@ func (v *VectorSearch) createIndex() error {
 	if err != nil {
 		return fmt.Errorf("failed to create index: %w", err)
 	}
+
+	logger.Info("successfully created redis search index",
+		observability.String("index_name", v.indexName))
 
 	return nil
 }
