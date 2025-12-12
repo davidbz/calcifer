@@ -143,7 +143,7 @@ func (v *VectorSearch) createIndex() error {
 	_ = v.client.FTDropIndex(ctx, v.indexName).Err()
 
 	// Create index using type-safe API
-	const embeddingDimension = 1536
+	embeddingDimension := v.embeddingGenerator.Dimension()
 
 	_, err := v.client.FTCreate(ctx, v.indexName,
 		&redis.FTCreateOptions{
@@ -228,7 +228,8 @@ func (v *VectorSearch) parseSearchResult(
 		logger.Warn("data field not found in search result",
 			observability.String("key", doc.ID))
 		return nil
-	} // Extract indexed_at
+	}
+	// Extract indexed_at
 	var indexedAt time.Time
 	if tsStr, tsOk := doc.Fields["indexed_at"]; tsOk {
 		if ts, parseErr := strconv.ParseInt(tsStr, 10, 64); parseErr == nil {
