@@ -24,53 +24,6 @@ func (_m *MockSemanticCache) EXPECT() *MockSemanticCache_Expecter {
 	return &MockSemanticCache_Expecter{mock: &_m.Mock}
 }
 
-// Delete provides a mock function with given fields: ctx, cacheKey
-func (_m *MockSemanticCache) Delete(ctx context.Context, cacheKey string) error {
-	ret := _m.Called(ctx, cacheKey)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Delete")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, cacheKey)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockSemanticCache_Delete_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Delete'
-type MockSemanticCache_Delete_Call struct {
-	*mock.Call
-}
-
-// Delete is a helper method to define mock.On call
-//   - ctx context.Context
-//   - cacheKey string
-func (_e *MockSemanticCache_Expecter) Delete(ctx interface{}, cacheKey interface{}) *MockSemanticCache_Delete_Call {
-	return &MockSemanticCache_Delete_Call{Call: _e.mock.On("Delete", ctx, cacheKey)}
-}
-
-func (_c *MockSemanticCache_Delete_Call) Run(run func(ctx context.Context, cacheKey string)) *MockSemanticCache_Delete_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
-	})
-	return _c
-}
-
-func (_c *MockSemanticCache_Delete_Call) Return(_a0 error) *MockSemanticCache_Delete_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockSemanticCache_Delete_Call) RunAndReturn(run func(context.Context, string) error) *MockSemanticCache_Delete_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // Get provides a mock function with given fields: ctx, req
 func (_m *MockSemanticCache) Get(ctx context.Context, req *domain.CompletionRequest) (*domain.CachedResponse, error) {
 	ret := _m.Called(ctx, req)
@@ -175,64 +128,6 @@ func (_c *MockSemanticCache_Set_Call) Return(_a0 error) *MockSemanticCache_Set_C
 }
 
 func (_c *MockSemanticCache_Set_Call) RunAndReturn(run func(context.Context, *domain.CompletionRequest, *domain.CompletionResponse, time.Duration) error) *MockSemanticCache_Set_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// Stats provides a mock function with given fields: ctx
-func (_m *MockSemanticCache) Stats(ctx context.Context) (*domain.CacheStats, error) {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Stats")
-	}
-
-	var r0 *domain.CacheStats
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (*domain.CacheStats, error)); ok {
-		return rf(ctx)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) *domain.CacheStats); ok {
-		r0 = rf(ctx)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*domain.CacheStats)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockSemanticCache_Stats_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Stats'
-type MockSemanticCache_Stats_Call struct {
-	*mock.Call
-}
-
-// Stats is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockSemanticCache_Expecter) Stats(ctx interface{}) *MockSemanticCache_Stats_Call {
-	return &MockSemanticCache_Stats_Call{Call: _e.mock.On("Stats", ctx)}
-}
-
-func (_c *MockSemanticCache_Stats_Call) Run(run func(ctx context.Context)) *MockSemanticCache_Stats_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockSemanticCache_Stats_Call) Return(_a0 *domain.CacheStats, _a1 error) *MockSemanticCache_Stats_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockSemanticCache_Stats_Call) RunAndReturn(run func(context.Context) (*domain.CacheStats, error)) *MockSemanticCache_Stats_Call {
 	_c.Call.Return(run)
 	return _c
 }

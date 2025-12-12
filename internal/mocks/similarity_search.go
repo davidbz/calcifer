@@ -74,53 +74,6 @@ func (_c *MockSimilaritySearch_Index_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
-// Remove provides a mock function with given fields: ctx, key
-func (_m *MockSimilaritySearch) Remove(ctx context.Context, key string) error {
-	ret := _m.Called(ctx, key)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Remove")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, key)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockSimilaritySearch_Remove_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Remove'
-type MockSimilaritySearch_Remove_Call struct {
-	*mock.Call
-}
-
-// Remove is a helper method to define mock.On call
-//   - ctx context.Context
-//   - key string
-func (_e *MockSimilaritySearch_Expecter) Remove(ctx interface{}, key interface{}) *MockSimilaritySearch_Remove_Call {
-	return &MockSimilaritySearch_Remove_Call{Call: _e.mock.On("Remove", ctx, key)}
-}
-
-func (_c *MockSimilaritySearch_Remove_Call) Run(run func(ctx context.Context, key string)) *MockSimilaritySearch_Remove_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
-	})
-	return _c
-}
-
-func (_c *MockSimilaritySearch_Remove_Call) Return(_a0 error) *MockSimilaritySearch_Remove_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockSimilaritySearch_Remove_Call) RunAndReturn(run func(context.Context, string) error) *MockSimilaritySearch_Remove_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // Search provides a mock function with given fields: ctx, embedding, threshold, limit
 func (_m *MockSimilaritySearch) Search(ctx context.Context, embedding []float64, threshold float64, limit int) ([]*domain.SearchResult, error) {
 	ret := _m.Called(ctx, embedding, threshold, limit)

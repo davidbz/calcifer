@@ -85,6 +85,47 @@ func (g *GatewayService) Stream(
 	return chunks, nil
 }
 
+// tryGetFromCache checks cache and returns early if found.
+func (g *GatewayService) tryGetFromCache(ctx context.Context, req *CompletionRequest) (*CompletionResponse, bool) {
+	if g.cache == nil {
+		return nil, false
+	}
+
+	logger := observability.FromContext(ctx)
+	logger.Info("checking semantic cache",
+		observability.String("model", req.Model))
+
+	cached, err := g.cache.Get(ctx, req)
+	if err != nil && !errors.Is(err, ErrCacheMiss) {
+		logger.Warn("cache get failed, continuing without cache",
+			observability.Error(err))
+		return nil, false
+	}
+
+	if cached == nil {
+		logger.Info("cache MISS - calling provider")
+		return nil, false
+	}
+
+	logger.Info("cache HIT - returning cached response",
+		observability.Float64("similarity_score", cached.SimilarityScore),
+		observability.String("cached_model", cached.Response.Model))
+	return cached.Response, true
+}
+
+// storeInCache attempts to cache the response.
+func (g *GatewayService) storeInCache(ctx context.Context, req *CompletionRequest, resp *CompletionResponse) {
+	if g.cache == nil {
+		return
+	}
+
+	logger := observability.FromContext(ctx)
+	if err := g.cache.Set(ctx, req, resp, 1*time.Hour); err != nil {
+		logger.Warn("failed to store in cache",
+			observability.Error(err))
+	}
+}
+
 // CompleteByModel handles a completion request with automatic provider routing.
 func (g *GatewayService) CompleteByModel(
 	ctx context.Context,
@@ -98,35 +139,18 @@ func (g *GatewayService) CompleteByModel(
 		return nil, errors.New("model cannot be empty")
 	}
 
-	logger := observability.FromContext(ctx)
-
-	// Check cache for non-streaming requests
-	if g.cache != nil && !req.Stream {
-		logger.Info("checking semantic cache",
-			observability.String("model", req.Model),
-			observability.Bool("cache_enabled", true))
-
-		cached, cacheErr := g.cache.Get(ctx, req)
-		if cacheErr != nil && !errors.Is(cacheErr, ErrCacheMiss) {
-			logger.Warn("cache get failed, continuing without cache",
-				observability.Error(cacheErr))
-		}
-		if cached != nil {
-			logger.Info("cache HIT - returning cached response",
-				observability.Float64("similarity_score", cached.SimilarityScore),
-				observability.String("cached_model", cached.Response.Model))
-			return cached.Response, nil
-		}
-		logger.Info("cache MISS - calling provider")
+	// Try cache first - early return if hit
+	if cached, found := g.tryGetFromCache(ctx, req); found {
+		return cached, nil
 	}
 
-	// Route to appropriate provider based on model.
+	// Route to appropriate provider based on model
 	provider, err := g.registry.GetByModel(ctx, req.Model)
 	if err != nil {
 		return nil, fmt.Errorf("provider routing failed: %w", err)
 	}
 
-	// Execute request.
+	// Execute request
 	response, err := provider.Complete(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("completion failed: %w", err)
@@ -137,14 +161,49 @@ func (g *GatewayService) CompleteByModel(
 	response.Usage.Cost = cost
 
 	// Store in cache
-	if g.cache != nil {
-		if setErr := g.cache.Set(ctx, req, response, 1*time.Hour); setErr != nil {
-			logger.Warn("failed to store in cache",
-				observability.Error(setErr))
-		}
-	}
+	g.storeInCache(ctx, req, response)
 
 	return response, nil
+}
+
+// tryGetStreamFromCache checks cache for streaming requests.
+func (g *GatewayService) tryGetStreamFromCache(ctx context.Context, req *CompletionRequest) (<-chan StreamChunk, bool) {
+	if g.cache == nil {
+		return nil, false
+	}
+
+	logger := observability.FromContext(ctx)
+	logger.Info("checking semantic cache for streaming request",
+		observability.String("model", req.Model))
+
+	cached, err := g.cache.Get(ctx, req)
+	if err != nil && !errors.Is(err, ErrCacheMiss) {
+		logger.Warn("cache get failed, continuing without cache",
+			observability.Error(err))
+		return nil, false
+	}
+
+	if cached == nil {
+		logger.Info("cache MISS - streaming from provider")
+		return nil, false
+	}
+
+	logger.Info("cache HIT - streaming cached response",
+		observability.Float64("similarity_score", cached.SimilarityScore),
+		observability.String("cached_model", cached.Response.Model))
+	return g.streamFromCache(cached.Response), true
+}
+
+// wrapStreamWithCache wraps a stream to enable caching.
+func (g *GatewayService) wrapStreamWithCache(
+	ctx context.Context,
+	req *CompletionRequest,
+	chunks <-chan StreamChunk,
+) <-chan StreamChunk {
+	if g.cache == nil {
+		return chunks
+	}
+	return g.cacheStreamWrapper(ctx, req, chunks)
 }
 
 // StreamByModel handles streaming completion requests with automatic provider routing.
@@ -160,43 +219,25 @@ func (g *GatewayService) StreamByModel(
 		return nil, errors.New("model cannot be empty")
 	}
 
-	logger := observability.FromContext(ctx)
-
-	// Check cache even for streaming requests
-	if g.cache != nil {
-		logger.Info("checking semantic cache for streaming request",
-			observability.String("model", req.Model))
-
-		cached, cacheErr := g.cache.Get(ctx, req)
-		if cacheErr != nil && !errors.Is(cacheErr, ErrCacheMiss) {
-			logger.Warn("cache get failed, continuing without cache",
-				observability.Error(cacheErr))
-		}
-		if cached != nil {
-			logger.Info("cache HIT - streaming cached response",
-				observability.Float64("similarity_score", cached.SimilarityScore),
-				observability.String("cached_model", cached.Response.Model))
-			return g.streamFromCache(cached.Response), nil
-		}
-		logger.Info("cache MISS - streaming from provider")
+	// Try cache first - early return if hit
+	if cached, found := g.tryGetStreamFromCache(ctx, req); found {
+		return cached, nil
 	}
 
+	// Route to provider
 	provider, err := g.registry.GetByModel(ctx, req.Model)
 	if err != nil {
 		return nil, fmt.Errorf("provider routing failed: %w", err)
 	}
 
+	// Stream from provider
 	chunks, err := provider.Stream(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to stream from provider: %w", err)
 	}
 
 	// Wrap the stream to buffer content for caching
-	if g.cache != nil {
-		return g.cacheStreamWrapper(ctx, req, chunks), nil
-	}
-
-	return chunks, nil
+	return g.wrapStreamWithCache(ctx, req, chunks), nil
 }
 
 // streamFromCache converts a cached response into a stream of chunks.
@@ -222,9 +263,6 @@ func (g *GatewayService) streamFromCache(response *CompletionResponse) <-chan St
 				Done:  false,
 				Error: nil,
 			}
-
-			// Small delay to simulate streaming
-			time.Sleep(streamDelayMs * time.Millisecond)
 		}
 
 		// Send final done chunk
