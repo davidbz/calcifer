@@ -110,6 +110,17 @@ func (g *GatewayService) tryGetFromCache(ctx context.Context, req *CompletionReq
 	logger.Info("cache HIT - returning cached response",
 		observability.Float64("similarity_score", cached.SimilarityScore),
 		observability.String("cached_model", cached.Response.Model))
+
+	// Populate cache metadata
+	cached.Response.Cache = &CacheMetadata{
+		Hit:             true,
+		SimilarityScore: cached.SimilarityScore,
+		CachedAt:        &cached.CachedAt,
+	}
+
+	// Cache hits are free
+	cached.Response.Usage.Cost = 0.0
+
 	return cached.Response, true
 }
 
@@ -191,6 +202,17 @@ func (g *GatewayService) tryGetStreamFromCache(ctx context.Context, req *Complet
 	logger.Info("cache HIT - streaming cached response",
 		observability.Float64("similarity_score", cached.SimilarityScore),
 		observability.String("cached_model", cached.Response.Model))
+
+	// Populate cache metadata
+	cached.Response.Cache = &CacheMetadata{
+		Hit:             true,
+		SimilarityScore: cached.SimilarityScore,
+		CachedAt:        &cached.CachedAt,
+	}
+
+	// Cache hits are free
+	cached.Response.Usage.Cost = 0.0
+
 	return g.streamFromCache(cached.Response), true
 }
 
@@ -318,6 +340,7 @@ func (g *GatewayService) cacheStreamWrapper(
 					Cost:             0,
 				},
 				FinishTime: time.Now(),
+				Cache:      nil,
 			}
 
 			// Detach context for async cache operation (original request context is canceled)

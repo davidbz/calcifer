@@ -573,11 +573,22 @@ func TestGatewayService_CompleteByModel_WithCache(t *testing.T) {
 			Model:    "gpt-4",
 			Provider: "openai",
 			Content:  "Cached response",
+			Usage: domain.Usage{
+				PromptTokens:     10,
+				CompletionTokens: 20,
+				TotalTokens:      30,
+				Cost:             0.001, // Will be overridden to 0 by cache logic
+			},
 		}
 
+		cachedAt := time.Now().Add(-1 * time.Hour)
 		mockCache.EXPECT().
 			Get(mock.Anything, req).
-			Return(&domain.CachedResponse{Response: cachedResp}, nil)
+			Return(&domain.CachedResponse{
+				Response:        cachedResp,
+				SimilarityScore: 0.95,
+				CachedAt:        cachedAt,
+			}, nil)
 
 		gateway := domain.NewGatewayService(mockRegistry, mockCostCalc, mockCache)
 
@@ -587,6 +598,17 @@ func TestGatewayService_CompleteByModel_WithCache(t *testing.T) {
 		require.NotNil(t, response)
 		require.Equal(t, "cached-123", response.ID)
 		require.Equal(t, "Cached response", response.Content)
+
+		// Verify cache metadata is populated
+		require.NotNil(t, response.Cache)
+		require.True(t, response.Cache.Hit)
+		require.InDelta(t, 0.95, response.Cache.SimilarityScore, 0.001)
+		require.NotNil(t, response.Cache.CachedAt)
+		require.Equal(t, cachedAt, *response.Cache.CachedAt)
+
+		// Verify cost is set to 0 for cache hits
+		require.InDelta(t, 0.0, response.Usage.Cost, 0.001)
+
 		mockCache.AssertExpectations(t)
 	})
 
@@ -645,6 +667,12 @@ func TestGatewayService_CompleteByModel_WithCache(t *testing.T) {
 		require.NotNil(t, response)
 		require.Equal(t, "provider-123", response.ID)
 		require.Equal(t, "Provider response", response.Content)
+
+		// Verify cache metadata is NOT populated for cache misses
+		require.Nil(t, response.Cache)
+
+		// Verify cost is calculated normally for cache misses
+		require.InDelta(t, 0.001, response.Usage.Cost, 0.0001)
 
 		mockRegistry.AssertExpectations(t)
 		mockProvider.AssertExpectations(t)

@@ -20,12 +20,20 @@ type Message struct {
 
 // CompletionResponse represents a unified LLM response.
 type CompletionResponse struct {
-	ID         string    `json:"id"`
-	Model      string    `json:"model"`
-	Provider   string    `json:"provider"`
-	Content    string    `json:"content"`
-	Usage      Usage     `json:"usage"`
-	FinishTime time.Time `json:"finish_time"`
+	ID         string         `json:"id"`
+	Model      string         `json:"model"`
+	Provider   string         `json:"provider"`
+	Content    string         `json:"content"`
+	Usage      Usage          `json:"usage"`
+	FinishTime time.Time      `json:"finish_time"`
+	Cache      *CacheMetadata `json:"cache,omitempty"`
+}
+
+// CacheMetadata provides cache status information.
+type CacheMetadata struct {
+	Hit             bool       `json:"hit"`
+	SimilarityScore float64    `json:"similarity_score,omitempty"`
+	CachedAt        *time.Time `json:"cached_at,omitempty"`
 }
 
 // StreamChunk represents a single streaming response chunk.

@@ -221,6 +221,13 @@ Request → Generate Embedding → Vector Search →
 
 **Cache Key**: SHA256 hash of normalized request text
 
+**Cache Metadata**:
+When a response is served from cache, the response includes cache metadata:
+- `hit`: `true` for cache hits, omitted for cache misses
+- `similarity_score`: Vector similarity score (0-1) indicating how similar the cached query was
+- `cached_at`: Timestamp when the response was originally cached
+- `cost`: Automatically set to `0.0` for cache hits (cache hits are free)
+
 ### 6. HTTP Handler (`internal/httpserver/handler.go`)
 
 **Responsibility**: HTTP request/response handling, SSE streaming.
@@ -250,6 +257,28 @@ Request → Generate Embedding → Vector Search →
     "completion_tokens": 25,
     "total_tokens": 37,
     "cost": 0.00126
+  },
+  "finish_time": "2024-01-15T10:30:00Z"
+}
+```
+
+**Response Format with Cache Hit**:
+```json
+{
+  "id": "resp-123",
+  "model": "gpt-4",
+  "provider": "openai",
+  "content": "Hello! How can I help?",
+  "usage": {
+    "prompt_tokens": 12,
+    "completion_tokens": 25,
+    "total_tokens": 37,
+    "cost": 0.0
+  },
+  "cache": {
+    "hit": true,
+    "similarity_score": 0.96,
+    "cached_at": "2024-01-15T09:30:00Z"
   },
   "finish_time": "2024-01-15T10:30:00Z"
 }

@@ -75,6 +75,7 @@ func (p *Provider) Complete(ctx context.Context, req *domain.CompletionRequest) 
 			Cost:             0.0,
 		},
 		FinishTime: time.Now(),
+		Cache:      nil,
 	}, nil
 }
 
