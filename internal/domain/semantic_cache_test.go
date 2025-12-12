@@ -184,15 +184,3 @@ func TestSemanticCacheService_Set_NilResponse(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, "response cannot be nil", err.Error())
 }
-
-func TestSemanticCacheService_Stats(t *testing.T) {
-	ctx := context.Background()
-	mockEmbedding := mocks.NewMockEmbeddingGenerator(t)
-	mockSearch := mocks.NewMockSimilaritySearch(t)
-
-	service := domain.NewSemanticCacheService(mockEmbedding, mockSearch, 0.85)
-
-	stats, err := service.Stats(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, stats)
-}

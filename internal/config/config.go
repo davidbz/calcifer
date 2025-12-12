@@ -41,6 +41,7 @@ type CacheConfig struct {
 	SimilarityThreshold float64       `env:"CACHE_SIMILARITY_THRESHOLD" envDefault:"0.85"`
 	TTL                 time.Duration `env:"CACHE_TTL"                  envDefault:"1h"`
 	EmbeddingModel      string        `env:"CACHE_EMBEDDING_MODEL"      envDefault:"text-embedding-ada-002"`
+	EmbeddingAPIKey     string        `env:"OPENAI_API_KEY"`
 }
 
 // RedisConfig contains Redis connection settings.

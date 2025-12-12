@@ -7,13 +7,11 @@
 Calcifer routes requests to multiple LLM providers based on model name and tracks token costs automatically.
 
 **Key Features:**
-- 🎯 Automatic provider routing
+- 🎯 Automatic provider routing based on model name
 - 💰 Real-time cost calculation (USD per request)
-- 🔌 Zero vendor lock-in (provider-agnostic domain)
-- 🚀 SSE streaming support
-- 🧪 98.6% test coverage in domain layer
-
-**Architecture:** Clean separation - Domain (business logic) → Provider (adapters) → HTTP (handlers)
+- 🔌 Zero vendor lock-in with provider-agnostic design
+- 🚀 SSE streaming support for real-time responses
+- 🧠 Semantic caching (optional, reduces costs & latency)
 
 ---
 
@@ -26,7 +24,7 @@ go mod download
 
 # Set API key and start
 export OPENAI_API_KEY="sk-..."
-go run ./cmd/main.go
+make run
 
 # Gateway running on http://localhost:8080
 ```
@@ -67,16 +65,6 @@ curl -X POST http://localhost:8080/v1/completions \
     "model": "echo4",
     "messages": [{"role": "user", "content": "Test message"}]
   }'
-
-# Response:
-# {
-#   "content": "Test message",
-#   "usage": {
-#     "prompt_tokens": 2,
-#     "completion_tokens": 2,
-#     "cost": 0.0002
-#   }
-# }
 ```
 
 The `echo4` provider:
@@ -107,134 +95,48 @@ Environment variables:
 - `OPENAI_TIMEOUT` - Timeout (default: 60s)
 - `OPENAI_MAX_RETRIES` - Max retries (default: 3)
 
----
+**Semantic Cache (Optional):**
+- `CACHE_ENABLED` - Enable semantic caching (default: false)
+- `CACHE_SIMILARITY_THRESHOLD` - Similarity threshold 0-1 (default: 0.85)
+- `CACHE_TTL` - Cache entry TTL (default: 1h)
+- `CACHE_EMBEDDING_MODEL` - OpenAI embedding model (default: text-embedding-ada-002)
+- `REDIS_URL` - Redis connection URL (default: redis://localhost:6379)
+- `REDIS_PASSWORD` - Redis password (optional)
+- `REDIS_DB` - Redis database number (default: 0)
 
-## Adding a New Provider
-
-Add a new LLM provider in 3 steps:
-
-**1. Implement Provider Interface:**
-```go
-// internal/provider/anthropic/adapter.go
-type Provider struct {
-    client *Client
-    name   string
-}
-
-func (p *Provider) Complete(ctx context.Context, req *domain.CompletionRequest) (*domain.CompletionResponse, error) {
-    // Convert domain → SDK types, call API, convert back
-}
-
-func (p *Provider) Stream(ctx context.Context, req *domain.CompletionRequest) (<-chan domain.StreamChunk, error) {
-    // Stream implementation
-}
-
-func (p *Provider) IsModelSupported(ctx context.Context, model string) bool {
-    return supportedModels[model]
-}
-```
-
-**2. Register Pricing:**
-```go
-// internal/provider/anthropic/pricing.go
-func RegisterPricing(ctx context.Context, registry domain.PricingRegistry) error {
-    return registry.RegisterPricing(ctx, "claude-3-opus", domain.PricingConfig{
-        InputCostPer1K:  0.015,  // $0.015 per 1K tokens
-        OutputCostPer1K: 0.075,  // $0.075 per 1K tokens
-    })
-}
-```
-
-**3. Wire in DI Container:**
-```go
-// cmd/main.go
-container.Provide(func(cfg *config.Config) (*anthropic.Provider, error) {
-    return anthropic.NewProvider(cfg.Anthropic)
-})
-
-container.Invoke(func(reg domain.ProviderRegistry, p *anthropic.Provider) error {
-    return reg.Register(ctx, p)
-})
-
-container.Invoke(func(pricingReg domain.PricingRegistry) error {
-    return anthropic.RegisterPricing(ctx, pricingReg)
-})
-```
-
-**Done.** The registry automatically routes requests based on model name and calculates costs.
+> **Note:** Semantic cache uses vector similarity to cache responses. Requires Redis with vector search support (RedisStack).
 
 ---
 
-## Architecture
+## Development
 
-### Layer Separation
-
-```
-HTTP Layer (handlers, middleware)
-    ↓
-Domain Layer (business logic, interfaces)
-    ↓
-Provider Layer (adapters for OpenAI, Anthropic, etc.)
-```
-
-**Key Principle:** Providers only translate types. Business logic stays in domain.
-
-### How It Works
-
-**Automatic Routing:**
-```go
-// Registry builds reverse index: model → provider
-registry.Register(ctx, openaiProvider)
-// Internally: modelToProvider["gpt-4"] = "openai"
-
-// O(1) lookup at request time
-provider := registry.GetByModel(ctx, "gpt-4")
-```
-
-**Cost Calculation:**
-```
-Provider returns tokens → GatewayService → CostCalculator → PricingRegistry → Response + Cost
-```
-
-Providers don't calculate cost. Domain layer enriches responses.
-
----
-
-## Project Structure
-
-```
-.
-├── cmd/main.go                    # Entry point, DI container
-├── internal/
-│   ├── domain/                    # Business logic
-│   │   ├── gateway.go            # Orchestration
-│   │   ├── cost_calculator.go    # Cost calculation
-│   │   ├── pricing_registry.go   # Pricing storage
-│   │   └── interfaces.go         # Core interfaces
-│   ├── provider/
-│   │   ├── registry/             # Provider registry
-│   │   ├── openai/               # OpenAI adapter
-│   │   └── echo/                 # Test provider
-│   ├── http/
-│   │   ├── handler.go            # HTTP handlers
-│   │   ├── server.go             # Server
-│   │   └── middleware/           # CORS, tracing
-│   ├── config/                    # Configuration
-│   └── observability/             # Logging
-└── go.mod
-```
-
----
-
-## Testing
+### Building & Testing
 
 ```bash
+# Build the app
+make build
+
 # Run all tests
-go test ./...
+make test
 
-# With coverage
-go test -cover ./...
+# Run with coverage
+make test-coverage
 
-# Regenerate mocks
-make mocks
+# Run locally
+make run
 ```
+
+For detailed development documentation including:
+- Architecture details and design patterns
+- Complete project structure
+- Adding new providers (step-by-step)
+- Request flow diagrams
+- Coding conventions
+
+**See [agents.md](agents.md)** - Developer and AI assistant guide.
+
+---
+
+## License
+
+MIT

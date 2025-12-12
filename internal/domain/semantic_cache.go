@@ -146,11 +146,6 @@ func (s *SemanticCacheService) Set(
 	return nil
 }
 
-// Stats returns cache performance metrics.
-func (s *SemanticCacheService) Stats(_ context.Context) (*CacheStats, error) {
-	return &CacheStats{}, nil
-}
-
 // buildQueryText constructs a consistent text representation of the request for embedding.
 func (s *SemanticCacheService) buildQueryText(req *CompletionRequest) string {
 	var parts []string

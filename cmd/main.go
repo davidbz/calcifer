@@ -159,13 +159,12 @@ func provideCache(container *dig.Container) {
 			return nil, ErrProviderNotConfigured
 		}
 
-		apiKey := os.Getenv("OPENAI_API_KEY")
-		if apiKey == "" {
+		if cfg.EmbeddingAPIKey == "" {
 			return nil, errors.New("OPENAI_API_KEY required for cache embeddings")
 		}
 
 		return embeddingOpenAI.NewGenerator(embeddingOpenAI.Config{
-			APIKey: apiKey,
+			APIKey: cfg.EmbeddingAPIKey,
 			Model:  cfg.EmbeddingModel,
 		})
 	})

@@ -12,9 +12,6 @@ type SemanticCache interface {
 
 	// Set stores a response with its embedding in the cache.
 	Set(ctx context.Context, req *CompletionRequest, resp *CompletionResponse, ttl time.Duration) error
-
-	// Stats returns cache performance metrics.
-	Stats(ctx context.Context) (*CacheStats, error)
 }
 
 // EmbeddingGenerator creates vector embeddings from text.
@@ -52,13 +49,4 @@ type SearchResult struct {
 	Similarity float64
 	Data       []byte
 	IndexedAt  time.Time
-}
-
-// CacheStats contains cache performance metrics.
-type CacheStats struct {
-	Hits          int64
-	Misses        int64
-	TotalRequests int64
-	HitRate       float64
-	CostSaved     float64
 }
